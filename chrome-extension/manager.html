@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SignalScope · 研究台</title>
+  <link rel="stylesheet" href="manager.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand">
+        <small>SignalScope / Social content research desk</small>
+        <h1>把帖子变成证据。</h1>
+        <p>拖入 LinkedIn 采集结果，自动合并、去重、质检与比较。页面完全离线运行，不需要终端，也不会上传文件。</p>
+      </div>
+      <div class="privacy"><i></i>数据仅停留在当前浏览器页面</div>
+    </header>
+
+    <section class="intake" aria-label="导入数据">
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="拖入或选择CSV和JSON文件">
+        <div>
+          <h2>将采集文件放到这里，研究台会接手余下工作。</h2>
+          <p>支持一次选择多份 CSV / JSON，包括旧累计文件和本轮新增文件；重复记录会按帖子链接自动合并。</p>
+        </div>
+        <div class="actions">
+          <label class="btn primary" for="fileInput">选择文件</label>
+          <input id="fileInput" type="file" accept=".csv,.json,text/csv,application/json" multiple>
+          <button class="btn" id="downloadCsv" disabled>下载合并 CSV</button>
+          <button class="btn" id="downloadJson" disabled>下载累计 JSON</button>
+          <button class="btn" id="saveReport" disabled>保存分析报告</button>
+          <button class="btn ghost danger" id="clearData" disabled>清空</button>
+        </div>
+      </div>
+      <aside class="ledger">
+        <div class="ledger-label">Research trail / 研究轨迹</div>
+        <strong id="totalSeal">000</strong>
+        <p>条唯一帖子进入当前研究集</p>
+        <div class="track" id="track"><div class="track-empty">导入文件后，这里会记录每一批证据。</div></div>
+      </aside>
+    </section>
+    <div class="notice" id="notice" role="status" aria-live="polite"></div>
+
+    <section class="dashboard" id="dashboard">
+      <div class="stats">
+        <div class="stat"><span>当前帖子</span><b id="statPosts">0</b><em id="statNew">等待导入</em></div>
+        <div class="stat"><span>平均互动量</span><b id="statAvgInteractions">0</b><em>点赞 + 评论 + 转发</em></div>
+        <div class="stat"><span>中位互动量</span><b id="statMedianInteractions">0</b><em>降低少数爆款的影响</em></div>
+        <div class="stat"><span>发布频率</span><b id="statFrequency">0/周</b><em>按估计发布日期计算</em></div>
+        <div class="stat"><span>使用标签</span><b id="statHashtags">0</b><em>当前筛选中的唯一标签</em></div>
+      </div>
+
+      <article class="panel insight-panel">
+        <div class="panel-head"><h2>运营观察</h2><small>基于当前筛选 · 规则分析</small></div>
+        <div class="insight-grid" id="opsInsights"><div class="empty">导入后生成可执行的内容线索</div></div>
+      </article>
+
+      <article class="panel topic-panel">
+        <div class="panel-head"><h2>内容主题分类</h2><small>自动初分 · 点击筛选 · 可在帖子表人工修正</small></div>
+        <div class="topic-board" id="topicBoard"><div class="empty">导入后自动识别内容主题</div></div>
+      </article>
+
+      <div class="grid">
+        <article class="panel">
+          <div class="panel-head"><h2>公司筛选看板</h2><small>点击公司 · 联动全部分析</small></div>
+          <div id="companyChart"><div class="empty">导入后显示公司对比</div></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><h2>内容形态</h2><small>数量 / 平均互动量</small></div>
+          <div class="media-list" id="mediaChart"><div class="empty">导入后显示媒体类型</div></div>
+        </article>
+      </div>
+
+      <div class="grid">
+        <article class="panel">
+          <div class="panel-head"><h2>发布节奏</h2><small>每月篇数 / 平均互动量</small></div>
+          <div class="trend-list" id="trendChart"><div class="empty">导入后显示发布趋势</div></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><h2>标签表现</h2><small>使用次数 / 平均互动量</small></div>
+          <div class="tag-list" id="hashtagChart"><div class="empty">导入后显示标签线索</div></div>
+        </article>
+      </div>
+
+      <article class="panel table-panel">
+        <div class="table-top">
+          <div class="panel-head"><h2>帖子证据表</h2><small><span id="visibleCount">0 条</span> · 按自定义加权互动分排序</small></div>
+          <div class="filters">
+            <input class="control" id="search" type="search" placeholder="搜索正文、公司或质量备注">
+            <select class="control" id="companyFilter"><option value="">所有公司</option></select>
+            <select class="control" id="topicFilter"><option value="">所有主题</option></select>
+            <select class="control" id="mediaFilter"><option value="">所有媒体</option></select>
+            <input class="control" id="dateFrom" type="date" aria-label="开始日期" title="开始日期">
+            <input class="control" id="dateTo" type="date" aria-label="结束日期" title="结束日期">
+            <button class="btn filter-download" id="downloadFiltered" disabled>下载当前筛选</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>公司</th><th>估计发布日期</th><th>正文</th><th>话题标签</th><th>内容主题</th><th>点赞</th><th>评论</th><th>转发</th><th>形态</th><th>原帖</th></tr></thead>
+            <tbody id="postRows"><tr><td colspan="10"><div class="empty">尚未导入数据</div></td></tr></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+    <p class="footer-note">平均互动量为点赞、评论与转发之和；自定义加权互动分仅用于辅助排序。SignalScope 不访问 LinkedIn，不保存登录信息。</p>
+  </main>
+
+  <script src="manager.js"></script>
+</body>
+</html>
+

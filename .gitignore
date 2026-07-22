@@ -1,0 +1,19 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+
+# Local captures and generated research artifacts
+data/
+output/
+dist/
+linkedin-all-companies.csv
+linkedin-all-companies.json
+linkedin-research-report.html
+linkedin-audit-manager.html
+build_report.py
+
+# Browser and office temporary profiles
+*_profile/
+*.tmp
+*.bak

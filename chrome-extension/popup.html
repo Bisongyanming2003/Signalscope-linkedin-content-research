@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SignalScope · LinkedIn 研究台</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow"><i></i> SIGNALSCOPE / CAPTURE</div>
+      <h1>从当前页面<br>收集公开帖子</h1>
+      <p>只读取当前公司 Posts 页面，不登录、不互动、不保存认证信息。</p>
+    </header>
+
+    <section class="page-state" id="pageState" aria-live="polite">
+      <span class="status-dot"></span>
+      <div><b id="pageTitle">正在检查页面…</b><small id="pageUrl"></small></div>
+    </section>
+
+    <section class="settings" aria-label="采集设置">
+      <label>目标数量<select id="targetCount"><option value="100" selected>100 篇</option><option value="50">50 篇</option><option value="30">30 篇</option></select></label>
+      <label>采集节奏<select id="captureMode"><option value="fast" selected>快速 2—3秒</option><option value="stable">稳定 3—5秒</option></select></label>
+    </section>
+
+    <section class="date-range" aria-label="日期范围">
+      <label>开始日期<input id="startDate" type="date"></label>
+      <label>结束日期<input id="endDate" type="date"></label>
+      <small>可选；向下扫描会在越过开始日期后停止</small>
+    </section>
+
+    <section class="company-profile">
+      <label>公司文件简称<input id="companyAlias" type="text" maxlength="36" placeholder="例如 goodwe"></label>
+      <small>用于批次文件和自动累计文件，可随时修改</small>
+    </section>
+
+    <section class="save-folder">
+      <div><b>结果保存位置</b><small id="folderStatus">正在检查…</small></div>
+      <button id="chooseFolder" type="button">选择文件夹</button>
+    </section>
+
+    <section class="modes">
+      <button class="mode primary" id="fullStart" disabled>
+        <span><b>完整采集</b><small id="fullSummary">目标 100 篇 · 快速模式</small></span><em>→</em>
+      </button>
+
+      <button class="mode secondary" id="earliestStart" disabled>
+        <span><b>查找最早帖子</b><small>持续向下扫描，直到账号历史底部</small></span><em>↓</em>
+      </button>
+
+      <button class="mode secondary" id="upwardStart" disabled>
+        <span><b>从当前位置向上扫描</b><small>请先手动滑到目标位置，再点击回扫</small></span><em>↑</em>
+      </button>
+
+      <button class="mode resume" id="resumeStart" disabled hidden>
+        <span><b>继续上次扫描</b><small id="resumeSummary">正在检查断点…</small></span><em>↻</em>
+      </button>
+
+      <div class="history">
+        <div class="history-copy"><b>增量采集</b><small>选择累计历史 JSON，遇到旧帖子后停止</small></div>
+        <label class="file-label" for="historyFile" id="fileLabel">选择历史 JSON</label>
+        <input id="historyFile" type="file" accept=".json,application/json">
+        <div class="file-meta" id="fileMeta">尚未选择文件</div>
+        <button class="mode secondary" id="incrementalStart" disabled>
+          <span><b>开始增量采集</b><small id="historyCount">等待历史文件</small></span><em>→</em>
+        </button>
+      </div>
+    </section>
+
+    <div class="message" id="message" role="status" aria-live="polite"></div>
+    <button class="manager-link" id="openManager"><span><b>打开研究台</b><small>合并、筛选与导出分析结果</small></span><em>↗</em></button>
+    <footer><span>手动触发</span><span>当前标签页</span><span>本地导出</span></footer>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
