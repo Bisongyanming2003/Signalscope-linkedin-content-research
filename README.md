@@ -1,208 +1,228 @@
-# LinkedIn 内容研究本地工具
+# SignalScope
 
-> 隐私与本地数据处理说明见 [PRIVACY.md](PRIVACY.md)。
+一个本地优先的 Chrome 扩展，用于采集和分析你在浏览器中已经能够正常查看的 LinkedIn 公司公开帖子。
 
-## 构建扩展发行包
+无需配置 API，不会自动登录，不上传采集结果，也不会点赞、评论、关注、转发或发帖。采集、合并和分析均在你的浏览器或电脑本地完成。
 
-运行 `./scripts/package_extension.sh`，即可在 `dist/` 中生成按版本命名的 Chrome 扩展 ZIP。GitHub Actions 会在每次推送和拉取请求时检查 JavaScript、扩展清单、Python 工具并验证打包流程。
+## 能做什么
 
-本工具只读取你在浏览器里已经能正常查看的公开公司帖子。它不会自动登录，不保存账号、密码、Cookie 或会话文件，也不会点赞、评论、关注、转发或发帖。遇到登录页、验证码、安全检查或访问限制时会立即停止；请不要用它绕过任何限制。
+- 采集最近 30、50 或 100 篇公司帖子
+- 持续向下查找账号最早的帖子
+- 从手动定位的位置向上回扫
+- 按日期范围采集
+- 中断后从本地检查点继续
+- 导出 CSV 和 JSON
+- 按公司自动维护去重后的累计文件
+- 在离线研究台中比较公司、主题、媒体形态、发布节奏和互动表现
 
-## 一键采集方式：Chrome 扩展（推荐）
+## 5 分钟快速开始
 
-项目的 `chrome-extension` 文件夹是一个本地 Manifest V3 扩展，只申请 `activeTab` 和 `scripting` 两项权限。
+### 1. 下载扩展
 
-1. Chrome 地址栏打开 `chrome://extensions/`。
-2. 打开右上角“开发者模式”。
-3. 点击“加载已解压的扩展程序”。
-4. 选择本项目中的 `chrome-extension` 文件夹。
-5. 打开 LinkedIn 公司 Posts 页面，点击工具栏中的扩展按钮。
-6. 首次点击“完整采集”；后续选择研究台导出的累计 JSON 后点击“开始增量采集”。
+打开仓库右侧的 [**Releases**](https://github.com/Bisongyanming2003/signalscope-linkedin-content-research/releases)，下载最新版本中的：
 
-弹窗可选择30/50/100篇目标，并提供快速模式（2—3秒）与稳定模式（3—5秒）。页面进度面板会说明滚动轮次、本轮新增、页面高度和最终停止原因；未达到目标时可以下载不含认证信息的诊断 JSON。
+```text
+signalscope-x.y.z.zip
+```
 
-采集进度显示在 LinkedIn 页面右上角，完成后自动下载 CSV 和 JSON。扩展不会后台运行，不申请 Cookie、历史记录或网站全局权限。详细说明见 `chrome-extension/README.md`。
+不要下载 GitHub 自动生成的 `Source code (zip)`；它包含整个源码仓库，不是精简的扩展安装包。
 
-## 无终端管理方式（推荐）
+下载后将 ZIP 解压到一个固定文件夹。安装后不要随意移动或删除该文件夹。
 
-安装Chrome扩展后，可直接点击弹窗底部的“打开研究台”。也可以双击 `linkedin-audit-manager.html`。两种方式都是完全离线的本地研究台，不需要安装依赖或运行终端命令。
+> 如果仓库尚未发布 Release，也可以下载仓库源码，并直接使用其中的 `chrome-extension` 文件夹。
 
-1. 把三家公司采集得到的 CSV 或 JSON 拖入页面，也可以点击“选择文件”。
-2. 页面自动合并、按帖子链接去重，并显示平均互动量、中位互动量、发布频率、公司表现和媒体类型。
-3. 在“公司筛选看板”点击公司，联动查看该公司的运营观察、发布节奏和标签表现；再次点击“全部公司”即可恢复全局视角。
-4. “内容主题分类”会依据正文和标签自动初分为产品、活动、案例、洞察、合作等主题；可点击主题筛选，并在帖子表中人工修正。
-5. 使用公司、主题、媒体、起止日期和关键词筛选帖子；点击“下载当前筛选”导出当前研究样本。
-6. 点击“下载合并 CSV”得到全部 Excel 总表，人工修正的 `content_topic` 会一并保存。
-7. 点击“下载累计 JSON”保存下一次增量采集需要使用的历史文件。
-8. 点击“保存分析报告”得到基于当前筛选、可单独打开和分享的本地 HTML 报告。
+### 2. 安装到 Chrome
 
-以后更新时，把旧的累计 JSON 和本轮新增文件一起拖入页面，再下载新的累计 JSON 即可。所有处理只发生在当前浏览器页面内；关闭页面前应下载需要保留的文件。
+1. 在 Chrome 地址栏打开 `chrome://extensions/`。
+2. 打开右上角的 **开发者模式**。
+3. 点击 **加载已解压的扩展程序**。
+4. 选择刚才解压后、里面直接包含 `manifest.json` 的文件夹。
+5. 在 Chrome 扩展菜单中将 **SignalScope · LinkedIn 研究台** 固定到工具栏。
 
-## 推荐方式：Chrome 控制台脚本
+更新版本时，替换本地扩展文件，然后回到 `chrome://extensions/` 点击 SignalScope 卡片上的刷新按钮。
 
-### 1. 打开目标页面
+### 3. 打开公司帖子页面
 
-先在 Chrome 中正常打开并确认能看到帖子：
+先正常登录 LinkedIn，然后打开一个公司 Posts 页面，例如：
 
-1. `https://www.linkedin.com/company/hiconics-drive-technology-co-ltd-/posts/?feedView=all`
-2. `https://www.linkedin.com/company/sungrow/posts/?feedView=all`
-3. `https://www.linkedin.com/company/goodwesolarengine1/posts/?feedView=all`
+```text
+https://www.linkedin.com/company/company-name/posts/?feedView=all
+```
 
-每次只处理当前页面。请等待首批帖子正常出现，不要在登录页或验证页运行。
+确认页面中已经能看到帖子，再点击工具栏中的 SignalScope 图标。扩展不会替你登录，也不会尝试绕过验证码、安全检查或访问限制。
 
-### 2. 打开 DevTools
+### 4. 完成第一次采集
 
-- macOS：按 `⌥ Option + ⌘ Command + I`
-- Windows/Linux：按 `Ctrl + Shift + I`
-- 或在页面空白处右键，选择“检查/Inspect”
+1. 可选：点击 **选择文件夹**，指定扫描结果的保存位置。
+2. 设置简短的公司文件名，例如 `goodwe` 或 `midea`。
+3. 保持日期范围为空。
+4. 目标数量选择 `30 篇`，用于第一次测试。
+5. 点击 **完整采集**。
+6. 在 LinkedIn 页面右上角查看进度；不要在扫描过程中切换到另一个公司页面。
+7. 完成后检查导出的 CSV 和 JSON。
 
-选择 **Console（控制台）**。如果 Chrome 首次阻止粘贴，请按控制台提示手动输入 `allow pasting`；这是 Chrome 自身的防误粘贴提醒，请只粘贴你已审阅的本地脚本。
+如果没有选择保存文件夹，或文件夹授权失效，结果会进入浏览器默认下载目录。
 
-### 3. 运行
+### 5. 打开研究台
 
-打开本目录的 `console-scraper.js`，全选复制，粘贴到 Console 后按 Enter。页面右上角会出现操作面板：首次采集直接点击“开始采集”；日后增量采集可先选择包含以往全部帖子的累计历史 JSON，再点击开始。脚本会：
+点击扩展弹窗底部的 **打开研究台**，然后拖入刚生成的 CSV 或 JSON。研究台会自动：
 
-- 尝试展开 “see more / 查看更多”；
-- 每次滚动后随机等待 2–4 秒；
-- 最多收集最近 100 篇，连续多次没有新帖子后自动结束；
-- 下载一个带 UTF-8 BOM 的 CSV 和一个 JSON 备份；
-- 在控制台显示数据表、采集数量、各字段缺失数量和错误日志。
+- 合并多个批次并按帖子链接去重
+- 显示平均互动量和中位互动量
+- 比较公司、主题和媒体类型
+- 分析发布节奏与话题标签
+- 支持关键词、日期、公司、主题和媒体筛选
+- 导出合并数据、累计 JSON、当前筛选或本地 HTML 报告
 
-运行后页面右上角会显示采集进度。需要提前结束时点击“停止并导出”，脚本会保存当时已经识别的数据。
+研究台完全离线运行。关闭页面前，请下载需要保留的修改和分析结果。
 
-### 增量采集
+## 采集模式
 
-第二次及以后采集时，在右上角面板选择由 `merge_outputs.py` 生成、包含以往全部帖子的累计历史 JSON（可以是单家公司累计文件，也可以是三家公司总文件）。脚本读取其中的帖子去重键；向下滚动遇到历史记录时自动停止，本次 CSV/JSON 只包含新增帖子。
+| 模式 | 适用场景 | 停止条件 |
+| --- | --- | --- |
+| 完整采集 | 快速获取最近一批帖子 | 达到 30、50 或 100 篇 |
+| 查找最早帖子 | 尽可能扫描整个账号历史 | 多轮确认已到页面底部 |
+| 从当前位置向上扫描 | 先手动滑到历史位置，再向较新的帖子回扫 | 返回页面顶部或手动停止 |
+| 增量采集 | 只采集上次累计文件之后的新帖子 | 遇到历史帖子 |
+| 继续上次扫描 | 长扫描被刷新、中断或手动停止 | 恢复原模式的停止条件 |
 
-- 历史文件只在当前页面内存中读取，不会上传。
-- 不要只选择“上一次新增批次”的 JSON，否则更早的帖子不在历史集合中。每轮采集后都应把旧累计文件与本轮新增文件重新合并，生成下一轮要使用的累计 JSON。
-- 如果历史 JSON 是很久以前的，中间曾漏采，建议偶尔不加载历史文件执行一次完整采集并重新合并。
-- 增量结果可以继续使用 `merge_outputs.py` 合并到历史总表。
+“开始日期”和“结束日期”可以留空。向下扫描设置开始日期后，越过该日期即停止，并只导出范围内的帖子。
 
-浏览器可能询问是否允许一次下载多个文件，请允许，否则 JSON 备份可能被拦截。
+## 导出文件
 
-### 4. 分别处理三个页面
+假设公司简称为 `goodwe`，扫描日期为 `2026-07-22`：
 
-在第一个页面运行完并确认两个文件下载完成后，再打开第二个页面，重复粘贴运行；第三个页面同理。不要在同一次运行过程中切换页面。文件名包含公司 URL 标识和采集时间，不会互相覆盖。
+| 文件 | 内容 |
+| --- | --- |
+| `goodwe-2026-07-22.csv` | 本次扫描，适合 Excel |
+| `goodwe-2026-07-22.json` | 本次扫描及完整元数据 |
+| `goodwe-master.csv` | 自动去重后的累计表格 |
+| `goodwe-master.json` | 累计帖子、覆盖日期、批次数和空白月份 |
 
-## 如何判断采集是否完整
+同一天重复扫描时，批次文件会自动添加 `-02`、`-03`，避免覆盖旧文件。只有在扩展获得指定文件夹的写入权限时，才会自动更新 `master` 文件。
 
-1. 控制台最终显示“完成：N 篇”；N 为 100 时说明已达到上限，而不代表公司只有 100 篇。
-2. 页面近期不足 100 篇，或 LinkedIn 不再加载新内容时，数量可能少于 100。
-3. 打开 CSV/JSON，抽查最前、最后各 2–3 篇，与页面的日期、文案、互动数字对照。
-4. 查看“缺失字段”。没有互动、评论或转发的帖子，相关数字可能为空；某些相对日期或隐藏永久链接也可能无法抽取。
-5. `post_url` 优先用于去重；缺少链接时按日期与文案前 100 字去重。
-6. 抽查正文、链接或估计发布日期为空的记录。
+## 如何理解完整度
 
-LinkedIn 可能按相关性、地区、语言或会话状态改变展示结果，因此这里的“最近”指当前页面实际加载出来的顺序。
+LinkedIn 可能根据账号、地区、语言、网络状态和页面实验改变展示结果。SignalScope 只能读取当前浏览器实际加载出来的内容，不能保证 LinkedIn 返回账号的全部历史帖子。
 
-采集上限提高到 100 后，会覆盖更多旧版帖子结构。脚本已排除明显的推广内容，并避免用通用卡片标题充当正文；但转发帖、已删除原帖、A/B 测试版式仍可能需要人工抽查。数量越大，抽样核对越重要。
+JSON 元数据中的 `boundary_confidence` 表示停止边界的可信度：
 
-## 选择器维护
+- `high`：页面高度稳定、连续位于底部并且多轮无新增
+- `medium`：到达日期边界、历史文件边界或页面顶部
+- `low`：用户停止、访问受限，或页面停止加载但尚未充分确认到底
 
-LinkedIn 会不定期调整页面结构。`console-scraper.js` 开头的 `SELECTORS` 集中了全部候选选择器；Python 备用脚本的对应常量也集中在文件顶部。若某字段大面积缺失，可在 DevTools 的 Elements 面板检查新元素特征，并把新候选放到相应数组最前面。
+正式研究前，建议抽查最早和最晚的几篇帖子，并检查正文、日期、永久链接和互动数字。
 
-优先使用语义稳定的属性（例如 `data-urn`、链接路径、`aria-label`），避免依赖随机生成的类名。
+## 常见问题
 
-## 常见错误与修复
+### 扩展提示“请先打开公司 Posts 页面”
 
-- **提示“请先打开 LinkedIn 公司 Posts 页面”**：确认 URL 形如 `/company/.../posts/`，且脚本是在该标签页的 Console 中运行。
-- **采集到 0 篇**：先手动滚动一次确认帖子已加载；若仍为 0，LinkedIn 很可能更新了 DOM，请维护脚本顶部的 `post` 和 `text` 候选选择器。
-- **文案不完整**：检查页面按钮是 “see more” 还是其他语言，把它的按钮选择器和显示文字加入 `seeMore`。
-- **互动数为空或取错**：不同版式的计数位置不同，更新 `reactions/comments/reposts` 候选；抽查后再用于分析。
-- **点赞数显示成“赞”**：这是旧版脚本把操作按钮误认为统计数字；请重新复制当前最新版 `console-scraper.js`，刷新页面后重跑。
-- **只下载一个文件**：在 Chrome 地址栏右侧或网站设置中允许该页面下载多个文件，然后重跑。
-- **Excel 乱码**：使用脚本生成的 CSV（已带 UTF-8 BOM），不要用文本编辑器另存为 ANSI；也可在 Excel 中通过“数据 → 从文本/CSV”选择 UTF-8。
-- **出现登录、验证码或访问限制**：脚本会停止。请关闭脚本并按 LinkedIn 正常流程手动处理；不要修改脚本绕过限制。
-- **控制台报 CSP 错误**：本脚本不请求外部资源，通常不受 CSP 影响；若页面仍阻止执行，使用下面的 Playwright 备用方式。
+确认地址形如：
 
-## 备用方式：Playwright Python
+```text
+https://www.linkedin.com/company/.../posts/
+```
 
-备用脚本不会启动自动登录，也不会把认证信息写入代码或项目。它只连接到**由你手动启动、手动登录**且开启了调试端口的 Chrome，并从其中当前打开的公司 Posts 标签页读取内容。
+刷新 LinkedIn 页面后再打开扩展。
 
-### 安装
+### 采集到 0 篇
 
-在本目录运行：
+先确认帖子已经显示，并手动滚动一次。仍然为 0 时，LinkedIn 可能更新了页面结构。下载诊断 JSON，并在 [GitHub Issues](https://github.com/Bisongyanming2003/signalscope-linkedin-content-research/issues) 中提交问题。
+
+### 只看到登录、验证码或安全检查
+
+扫描会主动停止。请按照 LinkedIn 的正常流程手动处理，不要修改扩展绕过限制。
+
+### 文件没有保存到指定文件夹
+
+重新打开扩展，检查“结果保存位置”。如果授权失效，重新点击 **选择文件夹**。扩展保存失败时会退回浏览器下载目录，避免丢失结果。
+
+### Excel 打开 CSV 出现乱码
+
+SignalScope 生成的 CSV 带 UTF-8 BOM。若仍有乱码，请在 Excel 中使用“数据 → 从文本/CSV”，并选择 UTF-8。
+
+### 日期为什么是估计值
+
+LinkedIn 经常只显示 `2d`、`3周` 等相对时间。`published_at_raw` 保存页面原文，`estimated_publish_date` 是根据采集时间换算的日期，不应视为官方精确发布时间。能够从 Activity ID 解析时间时，扩展会优先使用该信息辅助排序。
+
+## 数据字段
+
+CSV 与 JSON 中的帖子字段包括：
+
+```text
+company
+collected_at
+published_at_raw
+estimated_publish_date
+post_text_raw
+post_text
+hashtags
+post_url
+reactions
+comments
+reposts
+media_type
+```
+
+`media_type` 可能为 `image`、`video`、`document`、`carousel`、`link`、`text` 或 `unknown`。
+
+## 隐私与权限
+
+扩展仅在用户主动点击后处理当前 LinkedIn 公司 Posts 标签页：
+
+- `activeTab`：临时访问当前标签页
+- `scripting`：注入本地采集逻辑
+- 本地后台服务：保存文件、检查点、公司简称和累计数据，不发送网络请求
+
+SignalScope 不收集遥测、Cookie、浏览历史、账号、密码或认证信息。详情见 [PRIVACY.md](PRIVACY.md)。
+
+## 给开发者
+
+### 从源码安装
+
+克隆仓库后，在 `chrome://extensions/` 中加载 `chrome-extension` 文件夹即可。项目不需要前端构建工具或依赖安装。
+
+### 构建发行包
+
+macOS 或 Linux：
+
+```bash
+./scripts/package_extension.sh
+```
+
+发行包会生成到 `dist/signalscope-版本号.zip`。GitHub Actions 会自动检查 JavaScript、扩展清单、Python 工具和打包流程。
+
+### 可选的命令行工具
+
+- `merge_outputs.py`：合并多份 CSV/JSON 并去重
+- `analyze_report.py`：从合并 CSV 生成本地 HTML 报告
+- `linkedin_scraper.py`：连接用户手动启动并登录的 Chrome，作为扩展的 Playwright 备用采集方式
+- `console-scraper.js`：可在浏览器开发者工具中人工运行的备用脚本
+
+安装 Python 备用工具依赖：
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate              # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-`connect_over_cdp` 使用已安装的 Chrome，不需要执行 `playwright install`。
+## 负责任使用
 
-### 启动可连接的 Chrome
+请只采集你有权查看和研究的公开内容，遵守适用法律、LinkedIn 条款及组织内部政策。不要用本项目绕过登录、验证码、访问限制或技术保护措施。页面结构和展示结果可能变化，正式结论应经过抽样核对。
 
-先完全退出 Chrome，再手动启动一个开启调试端口的窗口。为了避免与日常 Chrome 实例冲突，可指定你自己管理的临时用户目录：
+## 反馈
 
-macOS：
+发现问题时，请在 [GitHub Issues](https://github.com/Bisongyanming2003/signalscope-linkedin-content-research/issues) 中提交：
 
-```bash
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --remote-debugging-port=9222 \
-  --user-data-dir="$HOME/linkedin-manual-chrome"
-```
+- Chrome 版本与操作系统
+- 公司 Posts 页面地址
+- 使用的采集模式
+- 停止原因和采集数量
+- 不含认证信息的诊断 JSON
 
-Windows（路径可能因安装位置不同而变化）：
+请勿上传 Cookie、账号信息、客户机密数据或未经授权的完整采集结果。
 
-```powershell
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="%USERPROFILE%\linkedin-manual-chrome"
-```
+## License
 
-在这个 Chrome 窗口中由你手动登录并打开一个目标 Posts 页面，然后运行：
-
-```bash
-python linkedin_scraper.py --output .
-```
-
-脚本不会读取或导出 Cookie，也不会保存 Playwright `storage_state`。但 Chrome 自己可能在你指定的用户目录中保留登录会话；如不希望保留，完成后退出 Chrome并手动删除该目录。不要把该目录放进本项目或同步/提交它。
-
-每个目标页面分别运行一次。若同时打开多个目标标签页，脚本选择最后找到的 Posts 标签页；为避免混淆，建议一次只保留一个目标标签页。可用 `--max 30` 调低上限，最大值固定为 100。
-
-## 数据说明
-
-- 数量支持 `1K`、`1.2K`、`M`、`B`、`万`、`亿`，可识别时转成整数；不能识别时保留页面原文。
-- 日期通常是 LinkedIn 展示的相对日期（如 `2d` / `2周`），除非页面提供标准时间属性；工具不会猜测日期。
-- `published_at_raw` 保留页面显示的相对发布时间；`estimated_publish_date` 按采集时间估算成标准日期，不能视为精确发布日期。
-- `post_text_raw` 保留含标签的页面原文；`post_text` 是去除话题标签后的正文；`hashtags` 单独保存去重后的 `#话题标签`。
-- 新导出的帖子字段固定为：`company, collected_at, published_at_raw, estimated_publish_date, post_text_raw, post_text, hashtags, post_url, reactions, comments, reposts, media_type`。未列出的旧字段不会进入新CSV或累计JSON。
-- `media_type` 为 `image`、`video`、`document`、`carousel`、`link`、`text` 或 `unknown`。
-- 新版 JSON 包含 `metadata`（采集批次信息）和 `posts`（帖子数组）；CSV 仍是最适合 Excel 的扁平表格。
-- 页面结构和 A/B 测试可能造成字段缺失。用于正式报告前务必抽样核对。
-
-## 合并多家公司结果
-
-`merge_outputs.py` 可以把多份 CSV 或 JSON 合并、跨文件去重，并同时输出总表 CSV 和 JSON。它兼容旧版“纯帖子数组”JSON及新版带 `metadata/posts` 的 JSON。
-
-建议把要合并的文件放进单独目录。CSV 和对应 JSON 包含同一批数据，同时放入也不会重复：
-
-```bash
-python3 merge_outputs.py /路径/到/采集结果目录 --output linkedin-all-companies.csv
-```
-
-也可以明确列出文件：
-
-```bash
-python3 merge_outputs.py sungrow.csv goodwe.csv hiconics.csv --output linkedin-all-companies.csv
-```
-
-输出包括 `linkedin-all-companies.csv` 和 `linkedin-all-companies.json`。合并只做结构化汇总与去重，不会访问 LinkedIn。
-
-## 生成本地内容研究报告
-
-先用 `merge_outputs.py` 得到三家公司总表，再运行：
-
-```bash
-python3 analyze_report.py linkedin-all-companies.csv --output linkedin-research-report.html
-```
-
-双击生成的 `linkedin-research-report.html` 即可查看。报告完全在本地生成，包含：
-
-- 公司发帖量与平均点赞、评论、转发；
-- 媒体类型表现；
-- 高频英文关键词与话题标签；
-- 加权互动表现最佳的 15 篇帖子；
-- 需要人工复核的数据数量。
-
-报告主要使用“点赞 + 评论 + 转发”计算平均互动量，并用中位互动量降低少数爆款的影响。“点赞 + 评论×2 + 转发×3”只作为帖子辅助排序的自定义运营分，不是 LinkedIn 官方互动率或学术标准，也没有按关注者数量校正。正式结论仍应结合样本量和数据质量判断。
+本项目采用 [MIT License](LICENSE)。
