@@ -22,4 +22,4 @@ Users choose when to start or stop every scan, which folder receives exports, an
 
 ## Contact
 
-Before public release, replace this section with the repository issue URL or a maintained contact address.
+Please use [GitHub Issues](https://github.com/Bisongyanming2003/Signalscope-linkedin-content-research/issues) for questions, bug reports, or privacy concerns.
