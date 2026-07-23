@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SignalScope · 小红书海报</title>
+  <link rel="stylesheet" href="posters.css">
+</head>
+<body>
+  <main class="poster poster-1">
+    <div class="grain"></div><div class="spine"></div>
+    <header class="mast"><b>SignalScope</b><span>LAZY BUILD LOG / 01</span></header>
+    <section class="pain-head">
+      <span class="note">说白了：因为懒</span>
+      <p class="eyebrow">做竞品内容研究时，我最烦这三件事</p>
+      <h1>帖子太多，<br>手动滑动太累，<br>录数据更麻烦。</h1>
+    </section>
+    <section class="pain-grid">
+      <article><i>01</i><h2>一直往下滑</h2><p>公司发了几百上千篇帖子，想找早期内容，只能不停滚页面。</p><strong>手酸 / 慢 / 容易中断</strong></article>
+      <article><i>02</i><h2>逐条复制粘贴</h2><p>正文、日期、点赞、评论、链接，一个字段一个字段抄进表格。</p><strong>机械 / 重复 / 很无聊</strong></article>
+      <article><i>03</i><h2>整理时还要去重</h2><p>多次采集容易重复，日期格式不统一，后面分析前还得再清洗。</p><strong>容易漏 / 容易错 / 费时间</strong></article>
+    </section>
+    <section class="answer-line"><small>所以我做了</small><b>一个替我干体力活的小工具。</b><span>→ 下一张</span></section>
+    <footer><span>不是什么宏大 motivation</span><span>就是不想手动干</span><span>2026.07</span></footer>
+  </main>
+
+  <main class="poster poster-2">
+    <div class="grain"></div><div class="spine"></div>
+    <header class="mast"><b>SignalScope</b><span>LAZY BUILD LOG / 02</span></header>
+    <section class="solution-head">
+      <p class="eyebrow">轻量级，不接 API，不搞复杂配置</p>
+      <h1>让浏览器替你滚，<br>替你记，替你整理。</h1>
+    </section>
+    <section class="before-after">
+      <div class="ba-head"><span>原来要手动做</span><span>现在交给 SignalScope</span></div>
+      <div><p>反复滚动帖子页面</p><b>→</b><p>自动向下扫描，直到数量或日期边界</p></div>
+      <div><p>想找最早帖子只能硬滑</p><b>→</b><p>查找最早帖子模式，持续扫描历史</p></div>
+      <div><p>逐条抄正文和互动数</p><b>→</b><p>一次导出 CSV + JSON</p></div>
+      <div><p>中断后从头再来</p><b>→</b><p>每 25 篇保存断点，可以继续</p></div>
+      <div><p>不同批次自己去重</p><b>→</b><p>master 文件自动累计、自动去重</p></div>
+    </section>
+    <section class="mode-block">
+      <div class="mode-title"><small>现在支持</small><b>5 种扫描方式</b></div>
+      <ul><li>最近 30 / 50 / 100 篇</li><li>查找最早帖子</li><li>从当前位置向上扫</li><li>按日期范围采集</li><li>加载历史文件做增量</li></ul>
+    </section>
+    <section class="output-row"><code>company-2026-07-23.csv</code><code>company-2026-07-23.json</code><code>company-master.json</code></section>
+    <footer><span>手动点开始</span><span>随时停止并导出</span><span>不执行互动</span></footer>
+  </main>
+
+  <main class="poster poster-3">
+    <div class="grain"></div><div class="spine"></div>
+    <header class="mast"><b>SignalScope</b><span>LAZY BUILD LOG / 03</span></header>
+    <section class="use-head">
+      <span class="note">真的很轻</span>
+      <p class="eyebrow">第一次用，先试 30 篇</p>
+      <h1>三步开始，<br>不用学新工具。</h1>
+    </section>
+    <section class="steps-dense">
+      <article><i>1</i><div><h2>打开公司 Posts 页面</h2><p>确认你已经登录，并且页面里能正常看到公开帖子。</p></div></article>
+      <article><i>2</i><div><h2>点击“完整采集”</h2><p>设置公司简称、日期范围和数量；页面右上角会显示进度。</p></div></article>
+      <article><i>3</i><div><h2>把结果拖进研究台</h2><p>自动合并、去重、筛选，对比主题、节奏和互动表现。</p></div></article>
+    </section>
+    <figure class="product-shot">
+      <img src="manager-real.png" alt="SignalScope 研究台真实界面">
+      <figcaption><b>真实界面</b><span>文件只在本地浏览器中处理</span></figcaption>
+    </figure>
+    <section class="fit-grid">
+      <div><small>适合</small><b>竞品内容盘点<br>账号历史整理<br>选题研究</b></div>
+      <div><small>不适合</small><b>无人值守批量抓取<br>绕过登录或验证<br>自动点赞评论</b></div>
+      <div><small>项目</small><b>GitHub 开源<br>Chrome 本地扩展<br>CSV / JSON</b></div>
+    </section>
+    <footer><span>数据留在本地</span><span>没有云端账号</span><span>只是少干点体力活</span></footer>
+  </main>
+  <script>document.body.dataset.poster=new URLSearchParams(location.search).get('poster')||'1';</script>
+</body>
+</html>

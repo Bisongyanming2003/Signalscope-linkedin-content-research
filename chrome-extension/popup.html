@@ -70,6 +70,21 @@
 
     <div class="message" id="message" role="status" aria-live="polite"></div>
     <button class="manager-link" id="openManager"><span><b>打开研究台</b><small>合并、筛选与导出分析结果</small></span><em>↗</em></button>
+    <section class="project-support" aria-label="项目支持与反馈">
+      <div class="support-copy">
+        <b>觉得好用？</b>
+        <small>一个 Star 或一封反馈，都能帮我继续改进。</small>
+      </div>
+      <div class="support-actions">
+        <button id="starProject" class="support-action star-action" type="button">
+          <span aria-hidden="true">★</span> GitHub Star
+        </button>
+        <button id="sendFeedback" class="support-action feedback-action" type="button">反馈问题</button>
+      </div>
+      <button id="copyFeedbackEmail" class="feedback-email" type="button" title="复制反馈邮箱">
+        bzp2003@163.com <span>复制</span>
+      </button>
+    </section>
     <footer><span>手动触发</span><span>当前标签页</span><span>本地导出</span></footer>
   </main>
   <script src="popup.js"></script>

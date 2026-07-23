@@ -157,6 +157,30 @@ $('openManager').addEventListener('click', async () => {
   await chrome.tabs.create({ url: chrome.runtime.getURL('manager.html') });
   window.close();
 });
+const PROJECT_URL = 'https://github.com/Bisongyanming2003/signalscope-linkedin-content-research';
+const FEEDBACK_EMAIL = 'bzp2003@163.com';
+$('starProject').addEventListener('click', async () => {
+  await chrome.tabs.create({ url: PROJECT_URL });
+  window.close();
+});
+$('sendFeedback').addEventListener('click', () => {
+  const subject = encodeURIComponent('SignalScope 使用反馈');
+  window.location.href = `mailto:${FEEDBACK_EMAIL}?subject=${subject}`;
+});
+$('copyFeedbackEmail').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(FEEDBACK_EMAIL);
+    const control = $('copyFeedbackEmail');
+    control.classList.add('copied');
+    control.querySelector('span').textContent = '已复制';
+    setTimeout(() => {
+      control.classList.remove('copied');
+      control.querySelector('span').textContent = '复制';
+    }, 1600);
+  } catch {
+    showMessage(`反馈邮箱：${FEEDBACK_EMAIL}`);
+  }
+});
 function updateSummary() {
   $('fullSummary').textContent = `目标 ${$('targetCount').value} 篇 · ${$('captureMode').value === 'stable' ? '稳定' : '快速'}模式`;
 }
