@@ -121,8 +121,8 @@ async function launch(posts, scanMode = 'limited', resumePosts = []) {
     const companyAlias = await saveCompanyProfile();
     const settings = {
       maxPosts: Number($('targetCount').value),
-      minWaitMs: mode === 'stable' ? 3000 : 2000,
-      maxWaitMs: mode === 'stable' ? 5000 : 3000,
+      minWaitMs: mode === 'stable' ? 1800 : 550,
+      maxWaitMs: mode === 'stable' ? 2600 : 850,
       maxIdleScrolls: mode === 'stable' ? 10 : 7,
       mode,
       scanMode,

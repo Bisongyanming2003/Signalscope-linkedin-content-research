@@ -29,12 +29,17 @@
     running = true;
     sendResponse({ accepted: true });
     const input = message.settings || {};
+    const mode = input.mode === 'stable' ? 'stable' : 'fast';
     const config = {
       maxPosts: [30,50,100].includes(Number(input.maxPosts)) ? Number(input.maxPosts) : DEFAULT_CONFIG.maxPosts,
-      minWaitMs: Math.max(2000, Math.min(5000, Number(input.minWaitMs) || DEFAULT_CONFIG.minWaitMs)),
-      maxWaitMs: Math.max(2000, Math.min(5000, Number(input.maxWaitMs) || DEFAULT_CONFIG.maxWaitMs)),
+      minWaitMs: mode === 'stable'
+        ? Math.max(1200, Math.min(5000, Number(input.minWaitMs) || 1800))
+        : Math.max(350, Math.min(1600, Number(input.minWaitMs) || 550)),
+      maxWaitMs: mode === 'stable'
+        ? Math.max(1500, Math.min(5000, Number(input.maxWaitMs) || 2600))
+        : Math.max(500, Math.min(2000, Number(input.maxWaitMs) || 850)),
       maxIdleScrolls: Math.max(5, Math.min(12, Number(input.maxIdleScrolls) || DEFAULT_CONFIG.maxIdleScrolls)),
-      mode: input.mode === 'stable' ? 'stable' : 'fast',
+      mode,
       scanMode: ['limited','earliest','upward'].includes(input.scanMode) ? input.scanMode : 'limited',
       startDate: /^\d{4}-\d{2}-\d{2}$/.test(input.startDate || '') ? input.startDate : '',
       endDate: /^\d{4}-\d{2}-\d{2}$/.test(input.endDate || '') ? input.endDate : '',
@@ -139,7 +144,7 @@
 
   function triggerNextPage(direction = 'down') {
     const before = scrollController();
-    const distance = Math.max(520, before.viewport * .82) * (direction === 'up' ? -1 : 1);
+    const distance = Math.max(560, before.viewport * .95) * (direction === 'up' ? -1 : 1);
     if (before.isDocument) {
       window.scrollBy({ top: distance, left: 0, behavior: 'smooth' });
     } else {
@@ -162,6 +167,15 @@
       }
       after.target.dispatchEvent(new Event('scroll', { bubbles: true }));
     }, 450);
+  }
+
+  function postsAtViewport(posts, scroll) {
+    const rootRect = scroll.isDocument ? {top:0,bottom:window.innerHeight} : scroll.target.getBoundingClientRect();
+    const padding = Math.min(140, scroll.viewport * .14);
+    return posts.filter(post => {
+      const rect = post.getBoundingClientRect();
+      return rect.bottom >= rootRect.top-padding && rect.top <= rootRect.bottom+padding;
+    });
   }
 
   function activityIdOf(row) {
@@ -295,11 +309,12 @@
     status.textContent=resumePosts.length?`继续上次扫描 · 已恢复 ${resumePosts.length} 篇`:historyKeys.size?`增量模式 · 历史 ${historyKeys.size} 篇`:config.scanMode==='earliest'?'正在查找最早帖子':config.scanMode==='upward'?'从当前位置向上扫描':`${config.mode==='stable'?'稳定':'快速'}模式 · 目标 ${config.maxPosts} 篇`;
     while(!stop&&!reached&&!dateReached&&(unlimited||[...collected.values()].filter(row=>inDateRange(row,config)).length<config.maxPosts)&&idle<config.maxIdleScrolls){
       const reason=blockedReason(); if(reason){stopReason='access_restricted';status.textContent=`已停止：${reason}`;alert(`${reason}。请勿尝试绕过限制。`);break;}
-      for(const post of allPosts()) for(const selector of SELECTORS.seeMore) for(const button of post.querySelectorAll(selector)){
+      const scrollBefore=scrollController(),currentPosts=postsAtViewport(allPosts(),scrollBefore);
+      for(const post of currentPosts) for(const selector of SELECTORS.seeMore) for(const button of post.querySelectorAll(selector)){
         const label=textOf(button)||clean(button.getAttribute('aria-label'));
         if(/see more|查看更多|显示更多|…more/i.test(label)&&!button.disabled)try{button.click();await sleep(200);}catch(error){errors.push(String(error));}
       }
-      for(const post of allPosts())try{const row=extract(post),key=keyOf(row),date=publishDate(row);if(!key)continue;if(historyKeys.has(key))reached=true;else if(!collected.has(key))collected.set(key,row);if(direction==='down'&&config.startDate&&date&&date<config.startDate)dateReached=true;}catch(error){errors.push(String(error));}
+      for(const post of currentPosts)try{const row=extract(post),key=keyOf(row),date=publishDate(row);if(!key)continue;if(historyKeys.has(key))reached=true;else if(!collected.has(key))collected.set(key,row);if(direction==='down'&&config.startDate&&date&&date<config.startDate)dateReached=true;}catch(error){errors.push(String(error));}
       const added=collected.size-previous;
       const scroll=scrollController(),height=scroll.height;
       const moved=previousScrollTop<0||Math.abs(scroll.top-previousScrollTop)>4;
@@ -316,7 +331,7 @@
       const oldest=oldestPost([...collected.values()]);
       const oldestLabel=oldest?(activityDate(oldest.id).slice(0,10)||oldest.row.estimated_publish_date||oldest.row.published_at_raw||'日期未知'):'尚未识别';
       metrics.innerHTML=`${direction==='up'?'向上':'向下'}滚动 ${scrollRounds} 次 · 本轮 +${added}<br>当前最早 ${oldestLabel} · 底部确认 ${Math.min(bottomRounds,3)}/3`;
-      status.textContent=reached?'已遇到历史记录，准备导出…':idle?`正在尝试加载更多（${idle}/${config.maxIdleScrolls}）`:'正在缓慢滚动…';
+      status.textContent=reached?'已遇到历史记录，准备导出…':idle?`已到加载边界，正在等待更多（${idle}/${config.maxIdleScrolls}）`:config.mode==='stable'?'正在稳定滚动并采集…':'正在快速滚动并采集…';
       if(reached){stopReason='history_boundary';break;}
       if(dateReached){stopReason='date_boundary';break;}
       if(direction==='up'&&scroll.top<=2){stopReason='top_boundary';break;}
