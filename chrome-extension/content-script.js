@@ -5,11 +5,11 @@
 
   const SELECTORS = {
     post: ['div.feed-shared-update-v2','div[data-urn*="urn:li:activity:"]','div[data-id*="urn:li:activity:"]','article[data-urn*="urn:li:activity:"]','article[data-id*="urn:li:activity:"]','[data-view-name="feed-full-update"]','.fie-impression-container'],
-    text: ['.feed-shared-update-v2__description .update-components-text','.feed-shared-update-v2__description .break-words','.feed-shared-update-v2__description-wrapper','.feed-shared-text','.update-components-text','[data-test-id="main-feed-activity-card__commentary"]','[data-view-name="feed-commentary"]','[data-test-id*="commentary"]'],
+    text: ['.feed-shared-update-v2__description .update-components-text','.feed-shared-update-v2__description .break-words','.feed-shared-update-v2__description-wrapper','.feed-shared-text','.update-components-text','[data-test-id="main-feed-activity-card__commentary"]','[data-view-name="feed-commentary"]','[data-test-id*="commentary"]','[data-view-name*="commentary"]','div[dir="ltr"] > span[dir="ltr"]','span[dir="ltr"]'],
     dateLink: ['a[href*="/feed/update/urn:li:activity:"]','a[href*="/posts/"]','a.app-aware-link[href*="activity"]','time a','a time'],
     date: ['time','.update-components-actor__sub-description','.feed-shared-actor__sub-description'],
     seeMore: ['button.feed-shared-inline-show-more-text__see-more-less-toggle','button[aria-label*="see more" i]','button[aria-label*="查看更多"]','.feed-shared-inline-show-more-text button'],
-    reactions: ['.social-details-social-counts__reactions-count','.social-details-social-counts__social-proof-text','.social-details-social-counts button[aria-label*="reaction" i]','.social-details-social-counts button[aria-label*="回应"]','button[aria-label*="reaction count" i]','button[aria-label*="回应数量"]'],
+    reactions: ['.social-details-social-counts__reactions-count','.social-details-social-counts__social-proof-text','.social-details-social-counts button[aria-label*="reaction" i]','.social-details-social-counts button[aria-label*="回应"]','button[aria-label*="reaction count" i]','button[aria-label*="回应数量"]','a[aria-label*="次回应"]','a[aria-label*="reactions" i]'],
     comments: ['button[aria-label*="comment" i]','button[aria-label*="评论"]','li.social-details-social-counts__comments','a[href*="comments"]'],
     reposts: ['button[aria-label*="repost" i]','button[aria-label*="转发"]','li.social-details-social-counts__item--right-aligned','button[aria-label*="share" i]'],
     blocked: ['form[action*="login"]','input[name="session_key"]','.checkpoint__container','#captcha-internal','[data-test-id="challenge-page"]'],
@@ -55,6 +55,25 @@
   const randomWait = config => sleep(config.minWaitMs + Math.random() * (config.maxWaitMs - config.minWaitMs));
   const keyOf = row => row.post_url || `${row.published_at_raw || row.post_date_raw || row.post_date || ''}|${String(row.post_text || '').slice(0,100)}`;
 
+  function heuristicPostCards() {
+    const anchors = [
+      ...document.querySelectorAll('button[aria-label*="动态控制菜单"],button[aria-label*="post control menu" i],button[aria-label*="control menu" i]')
+    ];
+    const cards = [];
+    for (const anchor of anchors) {
+      let node = anchor.parentElement;
+      for (let depth=0; node && node !== document.body && depth<14; depth++,node=node.parentElement) {
+        const hasComment = node.querySelector('button[aria-label^="评论"],button[aria-label*="comment" i]');
+        const hasRepost = node.querySelector('button[aria-label*="重新发布"],button[aria-label*="repost" i]');
+        const text = clean(node.innerText);
+        const hasDate = /(?:^|\s)\d+\s*(?:分钟|小时|天|日|周|星期|个月|月|年|mins?|minutes?|hours?|days?|weeks?|months?|years?)\s*[•·]/i.test(text);
+        if (hasComment && hasRepost && hasDate && text.length > 40) { cards.push(node); break; }
+      }
+    }
+    const unique = [...new Set(cards)];
+    return unique.filter(node => !unique.some(other => other !== node && node.contains(other)));
+  }
+
   function allPosts() {
     // Use the proven DevTools-script selectors first. They are intentionally
     // strict and were able to traverse long company feeds reliably.
@@ -72,7 +91,7 @@
     }
 
     // Only use broader candidates when the proven structure is absent.
-    const candidates = SELECTORS.post.flatMap(s => [...document.querySelectorAll(s)]);
+    const candidates = [...SELECTORS.post.flatMap(s => [...document.querySelectorAll(s)]), ...heuristicPostCards()];
     // Newer layouts sometimes expose only the permanent activity link. Walk up
     // to the nearest semantic card instead of accepting every generic article.
     for (const selector of SELECTORS.dateLink) {
@@ -214,10 +233,23 @@
   }
 
   function extract(post) {
-    const dateLink=first(post,SELECTORS.dateLink), dateEl=first(post,SELECTORS.date), textParts=splitPostText(textOf(first(post,SELECTORS.text)));
-    const rawDate=clean(dateEl?.getAttribute('datetime'))||textOf(dateEl)||textOf(dateLink), collectedAt=new Date().toISOString(), normalized=estimateDate(rawDate,collectedAt);
+    const dateLink=first(post,SELECTORS.dateLink), dateEl=first(post,SELECTORS.date);
+    const fallbackDate=clean(post.innerText).match(/(?:^|\s)(\d+\s*(?:分钟|小时|天|日|周|星期|个月|月|年|mins?|minutes?|hours?|days?|weeks?|months?|years?))(?:\s*[•·])/i)?.[1]||'';
+    let textEl=first(post,SELECTORS.text);
+    if(!textEl||textOf(textEl).length<30){
+      const selectorMatches=SELECTORS.text.flatMap(selector=>[...post.querySelectorAll(selector)]);
+      const candidates=[...new Set([...selectorMatches,...post.querySelectorAll('p,span,div')])].filter(el=>{
+        const value=textOf(el);
+        return value.length>=30&&el.children.length<=3&&!/位关注者|回应按钮状态|打开.*动态控制菜单/.test(value);
+      }).sort((a,b)=>textOf(b).length-textOf(a).length);
+      textEl=candidates[0]||null;
+    }
+    const textParts=splitPostText(textOf(textEl));
+    const rawDate=clean(dateEl?.getAttribute('datetime'))||textOf(dateEl)||fallbackDate||textOf(dateLink), collectedAt=new Date().toISOString(), normalized=estimateDate(rawDate,collectedAt);
     const urn=post.getAttribute('data-urn')||post.getAttribute('data-id')||'', activity=urn.match(/urn:li:activity:\d+/)?.[0];
-    const href=dateLink?.href||dateLink?.closest('a')?.href||'', url=href||(activity?`https://www.linkedin.com/feed/update/${activity}/`: '');
+    const href=dateLink?.href||dateLink?.closest('a')?.href||'';
+    const permanentHref=/\/feed\/update\/urn:li:activity:\d+|urn:li:activity:\d+|\/posts\/[^/?#]+-activity-\d+/i.test(href)?href:'';
+    const url=permanentHref||(activity?`https://www.linkedin.com/feed/update/${activity}/`: '');
     return {company:companyName(),collected_at:collectedAt,published_at_raw:rawDate,estimated_publish_date:normalized.date,post_text_raw:textParts.raw,post_text:textParts.text,hashtags:textParts.hashtags,post_url:url,
       reactions:countFrom(post,SELECTORS.reactions,/reaction|回应|赞|like/i),comments:countFrom(post,SELECTORS.comments,/comment|评论/i),reposts:countFrom(post,SELECTORS.reposts,/repost|share|转发|分享/i),media_type:mediaType(post)};
   }
