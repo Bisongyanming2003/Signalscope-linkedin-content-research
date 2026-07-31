@@ -89,14 +89,60 @@
       .filter(node => !SELECTORS.promoted.some(s => node.querySelector(s)));
   }
 
-  function triggerNextPage(direction = 'down') {
-    // Match the original DevTools collector exactly: one uninterrupted scroll
-    // to the current document bottom, followed by the full random wait.
-    if (direction === 'up') {
-      window.scrollBy({ top: -Math.max(500, window.innerHeight * .82), behavior: 'smooth' });
-    } else {
-      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+  function scrollController() {
+    const documentRoot = document.scrollingElement || document.documentElement;
+    const candidates = [documentRoot];
+    for (const post of allPosts()) {
+      let node = post.parentElement;
+      while (node && node !== document.body) {
+        const style = getComputedStyle(node);
+        if (/(auto|scroll|overlay)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 80) candidates.push(node);
+        node = node.parentElement;
+      }
     }
+    for (const selector of ['main','[role="main"]','.scaffold-layout__main','.application-outlet']) {
+      for (const node of document.querySelectorAll(selector)) {
+        if (node.scrollHeight > node.clientHeight + 80) candidates.push(node);
+      }
+    }
+    const target = [...new Set(candidates)].sort((a,b) =>
+      (b.scrollHeight - b.clientHeight) - (a.scrollHeight - a.clientHeight)
+    )[0] || documentRoot;
+    const isDocument = target === documentRoot || target === document.documentElement || target === document.body;
+    return {
+      target,
+      isDocument,
+      top: isDocument ? (window.scrollY || documentRoot.scrollTop || 0) : target.scrollTop,
+      height: target.scrollHeight,
+      viewport: isDocument ? window.innerHeight : target.clientHeight
+    };
+  }
+
+  function triggerNextPage(direction = 'down') {
+    const before = scrollController();
+    const distance = Math.max(520, before.viewport * .82) * (direction === 'up' ? -1 : 1);
+    if (before.isDocument) {
+      window.scrollBy({ top: distance, left: 0, behavior: 'smooth' });
+    } else {
+      before.target.scrollBy({ top: distance, left: 0, behavior: 'smooth' });
+    }
+    // Some LinkedIn layouts replace their feed container while loading. A
+    // plain assignment provides a reliable fallback when smooth scrolling is
+    // ignored or the container changes between rounds.
+    setTimeout(() => {
+      const after = scrollController();
+      if (Math.abs(after.top - before.top) > 4) return;
+      const nextTop = direction === 'up'
+        ? Math.max(0, after.top - Math.abs(distance))
+        : Math.min(after.height - after.viewport, after.top + Math.abs(distance));
+      if (after.isDocument) {
+        window.scrollTo(0, nextTop);
+        if (document.scrollingElement) document.scrollingElement.scrollTop = nextTop;
+      } else {
+        after.target.scrollTop = nextTop;
+      }
+      after.target.dispatchEvent(new Event('scroll', { bubbles: true }));
+    }, 450);
   }
 
   function activityIdOf(row) {
@@ -224,9 +270,9 @@
       for(const post of allPosts())try{const row=extract(post),key=keyOf(row),date=publishDate(row);if(!key)continue;if(historyKeys.has(key))reached=true;else if(!collected.has(key))collected.set(key,row);if(direction==='down'&&config.startDate&&date&&date<config.startDate)dateReached=true;}catch(error){errors.push(String(error));}
       const added=collected.size-previous;
       idle=added>0?0:idle+1;previous=collected.size;countEl.textContent=unlimited?`${collected.size} 篇`:`${Math.min(collected.size,config.maxPosts)} / ${config.maxPosts}`;
-      const height=document.documentElement.scrollHeight;
+      const scroll=scrollController(),height=scroll.height;
       stableHeightRounds=height===previousHeight?stableHeightRounds+1:0;previousHeight=height;
-      bottomRounds=direction==='down'&&window.scrollY+window.innerHeight>=height-24?bottomRounds+1:0;
+      bottomRounds=direction==='down'&&scroll.top+scroll.viewport>=height-24?bottomRounds+1:0;
       rounds.push({round:scrollRounds,posts:collected.size,added,page_height:height,idle_count:idle,at:new Date().toISOString()});
       const oldest=oldestPost([...collected.values()]);
       const oldestLabel=oldest?(activityDate(oldest.id).slice(0,10)||oldest.row.estimated_publish_date||oldest.row.published_at_raw||'日期未知'):'尚未识别';
@@ -234,7 +280,7 @@
       status.textContent=reached?'已遇到历史记录，准备导出…':idle?`正在尝试加载更多（${idle}/${config.maxIdleScrolls}）`:'正在缓慢滚动…';
       if(reached){stopReason='history_boundary';break;}
       if(dateReached){stopReason='date_boundary';break;}
-      if(direction==='up'&&window.scrollY<=2){stopReason='top_boundary';break;}
+      if(direction==='up'&&scroll.top<=2){stopReason='top_boundary';break;}
       if(collected.size-lastCheckpointSize>=25){await saveCheckpoint(slug,[...collected.values()],config);lastCheckpointSize=collected.size;status.textContent=`已自动保存断点 · ${collected.size} 篇`;}
       triggerNextPage(direction);scrollRounds++;await randomWait(config);
     }
