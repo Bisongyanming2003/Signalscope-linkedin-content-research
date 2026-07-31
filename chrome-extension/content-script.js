@@ -289,7 +289,7 @@
     const panel=createPanel(config), status=panel.querySelector('[data-status]'), countEl=panel.querySelector('[data-count]'), metrics=panel.querySelector('[data-metrics]'), diagnosticButton=panel.querySelector('[data-diagnostic]');
     const historyKeys=new Set(historyPosts.map(keyOf).filter(Boolean)), collected=new Map(resumePosts.map(row=>[keyOf(row),row]).filter(([key])=>key));
     const rounds=[];
-    let stop=false,reached=false,dateReached=false,idle=0,previous=collected.size,scrollRounds=0,stopReason='',previousHeight=0,stableHeightRounds=0,bottomRounds=0,lastCheckpointSize=collected.size;
+    let stop=false,reached=false,dateReached=false,idle=0,previous=collected.size,scrollRounds=0,stopReason='',previousHeight=0,previousScrollTop=-1,stalledScrollRounds=0,stableHeightRounds=0,bottomRounds=0,lastCheckpointSize=collected.size;
     panel.querySelector('[data-stop]').addEventListener('click',()=>{stop=true;stopReason='user_stopped';status.textContent='正在停止并整理文件…';});
     const unlimited=config.scanMode!=='limited'||Boolean(config.startDate), direction=config.scanMode==='upward'?'up':'down', slug=location.pathname.match(/^\/company\/([^/]+)/)?.[1].replace(/-+$/,'')||'linkedin';
     status.textContent=resumePosts.length?`继续上次扫描 · 已恢复 ${resumePosts.length} 篇`:historyKeys.size?`增量模式 · 历史 ${historyKeys.size} 篇`:config.scanMode==='earliest'?'正在查找最早帖子':config.scanMode==='upward'?'从当前位置向上扫描':`${config.mode==='stable'?'稳定':'快速'}模式 · 目标 ${config.maxPosts} 篇`;
@@ -301,8 +301,15 @@
       }
       for(const post of allPosts())try{const row=extract(post),key=keyOf(row),date=publishDate(row);if(!key)continue;if(historyKeys.has(key))reached=true;else if(!collected.has(key))collected.set(key,row);if(direction==='down'&&config.startDate&&date&&date<config.startDate)dateReached=true;}catch(error){errors.push(String(error));}
       const added=collected.size-previous;
-      idle=added>0?0:idle+1;previous=collected.size;countEl.textContent=unlimited?`${collected.size} 篇`:`${Math.min(collected.size,config.maxPosts)} / ${config.maxPosts}`;
       const scroll=scrollController(),height=scroll.height;
+      const moved=previousScrollTop<0||Math.abs(scroll.top-previousScrollTop)>4;
+      stalledScrollRounds=moved?0:stalledScrollRounds+1;previousScrollTop=scroll.top;
+      const atBoundary=direction==='down'?scroll.top+scroll.viewport>=height-24:scroll.top<=2;
+      // Posts already present in the DOM are collected in the first round.
+      // Moving through those cards should not consume the idle allowance:
+      // LinkedIn loads the next batch only after the real feed boundary is hit.
+      idle=added>0?0:(atBoundary||stalledScrollRounds>=2?idle+1:0);
+      previous=collected.size;countEl.textContent=unlimited?`${collected.size} 篇`:`${Math.min(collected.size,config.maxPosts)} / ${config.maxPosts}`;
       stableHeightRounds=height===previousHeight?stableHeightRounds+1:0;previousHeight=height;
       bottomRounds=direction==='down'&&scroll.top+scroll.viewport>=height-24?bottomRounds+1:0;
       rounds.push({round:scrollRounds,posts:collected.size,added,page_height:height,idle_count:idle,at:new Date().toISOString()});
