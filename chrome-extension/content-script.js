@@ -230,7 +230,7 @@
     return null;
   }
 
-  function capturedLink(timeout=350) {
+  function capturedLink(timeout=900) {
     return new Promise(resolve=>{
       let timer;
       const receive=event=>{
@@ -249,7 +249,7 @@
       const menuButton=controls.find(node=>/动态控制菜单|post control menu|open.*control menu/i.test(actionLabel(node)));
       if(!menuButton)return '';
       try{
-        menuButton.click();await sleep(90);
+        menuButton.click();await sleep(130);
         const menuItems=[...document.querySelectorAll('[role="menuitem"],button,[role="button"]')].filter(node=>{
           const rect=node.getBoundingClientRect();return rect.width>0&&rect.height>0;
         });
