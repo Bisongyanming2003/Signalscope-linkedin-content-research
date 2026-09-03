@@ -61,18 +61,24 @@
   const keyOf = row => row.post_url || `${row.published_at_raw || row.post_date_raw || row.post_date || ''}|${String(row.post_text || '').slice(0,100)}`;
 
   function heuristicPostCards() {
-    const anchors = [
-      ...document.querySelectorAll('button[aria-label*="动态控制菜单"],button[aria-label*="post control menu" i],button[aria-label*="control menu" i]')
-    ];
+    // LinkedIn's newer company feed no longer exposes activity URNs on the
+    // card. Locate each card from its repeated action row instead. Control-menu
+    // labels change frequently, while comment/repost actions remain semantic.
+    const anchors = [...new Set([
+      ...document.querySelectorAll('button[aria-label*="动态控制菜单"],button[aria-label*="post control menu" i],button[aria-label*="control menu" i]'),
+      ...document.querySelectorAll('button[aria-label^="评论"],button[aria-label*="comment" i]'),
+      ...document.querySelectorAll('button[aria-label*="重新发布"],button[aria-label*="repost" i]')
+    ])];
     const cards = [];
     for (const anchor of anchors) {
       let node = anchor.parentElement;
       for (let depth=0; node && node !== document.body && depth<14; depth++,node=node.parentElement) {
         const hasComment = node.querySelector('button[aria-label^="评论"],button[aria-label*="comment" i]');
         const hasRepost = node.querySelector('button[aria-label*="重新发布"],button[aria-label*="repost" i]');
+        const hasSend = node.querySelector('a[aria-label*="发送"],button[aria-label*="发送"],a[aria-label*="send" i],button[aria-label*="send" i]');
         const text = clean(node.innerText);
         const hasDate = /(?:^|\s)\d+\s*(?:分钟|小时|天|日|周|星期|个月|月|年|mins?|minutes?|hours?|days?|weeks?|months?|years?)\s*[•·]/i.test(text);
-        if (hasComment && hasRepost && hasDate && text.length > 40) { cards.push(node); break; }
+        if (hasComment && hasRepost && (hasSend || hasDate) && hasDate && text.length > 40) { cards.push(node); break; }
       }
     }
     const unique = [...new Set(cards)];
@@ -96,7 +102,8 @@
     }
 
     // Only use broader candidates when the proven structure is absent.
-    const candidates = [...SELECTORS.post.flatMap(s => [...document.querySelectorAll(s)]), ...heuristicPostCards()];
+    const heuristic = heuristicPostCards(), heuristicSet = new Set(heuristic);
+    const candidates = [...SELECTORS.post.flatMap(s => [...document.querySelectorAll(s)]), ...heuristic];
     // Newer layouts sometimes expose only the permanent activity link. Walk up
     // to the nearest semantic card instead of accepting every generic article.
     for (const selector of SELECTORS.dateLink) {
@@ -107,10 +114,19 @@
     }
     const unique = [...new Set(candidates)].filter(node => {
       const urn = `${node.getAttribute('data-urn') || ''} ${node.getAttribute('data-id') || ''}`;
-      return /urn:li:activity:\d+/.test(urn) || SELECTORS.dateLink.some(s => node.querySelector(s));
+      return heuristicSet.has(node) || /urn:li:activity:\d+/.test(urn) || SELECTORS.dateLink.some(s => node.querySelector(s));
     });
     return unique.filter(node => !unique.some(other => other !== node && other.contains(node)))
       .filter(node => !SELECTORS.promoted.some(s => node.querySelector(s)));
+  }
+
+  function selectorDiagnostics() {
+    return {
+      ...Object.fromEntries(SELECTORS.post.map(s=>[s,document.querySelectorAll(s).length])),
+      heuristic_action_cards: heuristicPostCards().length,
+      comment_action_buttons: document.querySelectorAll('button[aria-label^="评论"],button[aria-label*="comment" i]').length,
+      repost_action_buttons: document.querySelectorAll('button[aria-label*="重新发布"],button[aria-label*="repost" i]').length
+    };
   }
 
   function scrollController() {
@@ -347,7 +363,7 @@
       stopReason=collected.size?'date_range_empty':'selector_not_found';panel.querySelector('[data-title]').textContent=collected.size?'日期范围内没有帖子':'SignalScope 未找到帖子';
       status.textContent=collected.size?'已扫描到帖子，但没有符合当前日期范围的结果。':'请确认帖子已经显示，刷新页面后重试。未生成空文件。';
       countEl.textContent='0 篇'; panel.querySelector('[data-stop]')?.remove();
-      const diagnostic={version:'1.1.0',stop_reason:stopReason,stop_label:stopLabel(stopReason),url:location.href,config,history_count:historyKeys.size,rounds,selector_hits:Object.fromEntries(SELECTORS.post.map(s=>[s,document.querySelectorAll(s).length])),errors,generated_at:new Date().toISOString()};
+      const diagnostic={version:'1.2.0',stop_reason:stopReason,stop_label:stopLabel(stopReason),url:location.href,config,history_count:historyKeys.size,rounds,selector_hits:selectorDiagnostics(),errors,generated_at:new Date().toISOString()};
       diagnosticButton.style.display='inline-block';diagnosticButton.addEventListener('click',()=>download(`${fileAlias}-${stamp}-diagnostic.json`,JSON.stringify(diagnostic,null,2),'application/json;charset=utf-8'));
       console.warn('[SignalScope] 未识别到帖子。',diagnostic);
       return;
@@ -363,7 +379,7 @@
     else await saveCheckpoint(slug,[...collected.values()],config);
     panel.querySelector('[data-title]').textContent='SignalScope 采集结束';
     status.textContent=`${stopLabel(stopReason)} · 本批 ${rows.length} 篇${master?.updated?` · 累计 ${master.collected_count} 篇`:(csvSaved&&jsonSaved?' · 批次已保存':'')}`;panel.querySelector('[data-stop]')?.remove();
-    const diagnostic={version:'1.1.0',...metadata,config,rounds,selector_hits:Object.fromEntries(SELECTORS.post.map(s=>[s,document.querySelectorAll(s).length])),errors};
+    const diagnostic={version:'1.2.0',...metadata,config,rounds,selector_hits:selectorDiagnostics(),errors};
     if(!['target_reached','date_boundary','history_boundary','oldest_boundary','top_boundary'].includes(stopReason)){
       diagnosticButton.style.display='inline-block';diagnosticButton.addEventListener('click',()=>download(`${fileAlias}-${stamp}-diagnostic.json`,JSON.stringify(diagnostic,null,2),'application/json;charset=utf-8'));
     } else setTimeout(()=>panel.remove(),6000);
