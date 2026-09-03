@@ -245,13 +245,13 @@ if manager.exists():
 story += [
     P("研究台会自动完成", "H2CN"),
     *bullets([
-        "合并多个批次，并按帖子链接去重。",
+        "合并多个批次，并按发布日期与正文去重。",
         "比较公司、主题、媒体类型、发布节奏和互动表现。",
         "按关键词、日期、公司、主题和媒体筛选。",
         "导出合并数据、累计 JSON、当前筛选或本地 HTML 报告。"
     ]),
     Spacer(1, 4*mm),
-    box("如何理解完整度", "SignalScope 只能读取当前浏览器实际加载出来的内容，不能保证 LinkedIn 返回账号全部历史。JSON 中的 boundary_confidence 用 high、medium、low 表示停止边界的可信度。正式研究前，请抽查最早和最晚的帖子，并核对正文、日期、链接和互动数字。", CREAM),
+    box("如何理解完整度", "SignalScope 只能读取当前浏览器实际加载出来的内容，不能保证 LinkedIn 返回账号全部历史。JSON 中的 boundary_confidence 用 high、medium、low 表示停止边界的可信度。正式研究前，请抽查最早和最晚的帖子，并核对正文、日期和互动数字。", CREAM),
     PageBreak()
 ]
 

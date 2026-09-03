@@ -21,7 +21,7 @@
       <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="拖入或选择CSV和JSON文件">
         <div>
           <h2>将采集文件放到这里，研究台会接手余下工作。</h2>
-          <p>支持一次选择多份 CSV / JSON，包括旧累计文件和本轮新增文件；重复记录会按帖子链接自动合并。</p>
+          <p>支持一次选择多份 CSV / JSON，包括旧累计文件和本轮新增文件；重复记录会按日期与正文自动合并。</p>
         </div>
         <div class="actions">
           <label class="btn primary" for="fileInput">选择文件</label>
@@ -97,8 +97,8 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>公司</th><th>估计发布日期</th><th>正文</th><th>话题标签</th><th>内容主题</th><th>点赞</th><th>评论</th><th>转发</th><th>形态</th><th>原帖</th></tr></thead>
-            <tbody id="postRows"><tr><td colspan="10"><div class="empty">尚未导入数据</div></td></tr></tbody>
+            <thead><tr><th>公司</th><th>估计发布日期</th><th>正文</th><th>话题标签</th><th>内容主题</th><th>点赞</th><th>评论</th><th>转发</th><th>形态</th></tr></thead>
+            <tbody id="postRows"><tr><td colspan="9"><div class="empty">尚未导入数据</div></td></tr></tbody>
           </table>
         </div>
       </article>
@@ -109,4 +109,3 @@
   <script src="manager.js"></script>
 </body>
 </html>
-

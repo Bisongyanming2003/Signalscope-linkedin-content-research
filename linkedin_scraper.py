@@ -162,22 +162,9 @@ async def collect(page: Page, maximum: int) -> tuple[list[dict[str, Any]], list[
                 date = await first_text(post, DATE_SELECTORS)
                 collected_at = datetime.now(timezone.utc).isoformat()
                 estimated_date, is_estimated = estimate_date(date, collected_at)
-                url = ""
-                for selector in DATE_LINK_SELECTORS:
-                    loc = post.locator(selector).first
-                    if await loc.count():
-                        url = await loc.get_attribute("href") or ""
-                        if url:
-                            url = str(page.url).split("/company/")[0] + url if url.startswith("/") else url
-                            break
-                urn = await post.get_attribute("data-urn") or await post.get_attribute("data-id") or ""
-                activity = re.search(r"urn:li:activity:\d+", urn)
-                if not url and activity:
-                    url = f"https://www.linkedin.com/feed/update/{activity.group(0)}/"
                 row: dict[str, Any] = {"company": company, "collected_at": collected_at,
                                        "published_at_raw": date, "estimated_publish_date": estimated_date,
-                                       "post_text_raw": raw_text, "post_text": text, "hashtags": hashtags,
-                                       "post_url": url}
+                                       "post_text_raw": raw_text, "post_text": text, "hashtags": hashtags}
                 for field, selectors in COUNT_SELECTORS.items():
                     row[field] = parse_count(await first_numeric_text(post, selectors))
                 row["media_type"] = "text" if text else "unknown"
@@ -185,7 +172,7 @@ async def collect(page: Page, maximum: int) -> tuple[list[dict[str, Any]], list[
                     if any([await post.locator(s).count() for s in selectors]):
                         row["media_type"] = media
                         break
-                key = url or f"{date}|{text[:100]}"
+                key = f"{date}|{text[:100]}"
                 if key.strip("|"):
                     seen[key] = row
             except Exception as exc:
@@ -219,7 +206,7 @@ async def main() -> None:
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         base = args.output / f"{slug}-posts-{stamp}"
         fields = ["company", "collected_at", "published_at_raw", "estimated_publish_date",
-                  "post_text_raw", "post_text", "hashtags", "post_url", "reactions", "comments", "reposts", "media_type"]
+                  "post_text_raw", "post_text", "hashtags", "reactions", "comments", "reposts", "media_type"]
         with base.with_suffix(".csv").open("w", encoding="utf-8-sig", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fields); writer.writeheader(); writer.writerows(rows)
         metadata = {"schema_version": "2.0", "source_url": page.url, "company": rows[0]["company"] if rows else "",

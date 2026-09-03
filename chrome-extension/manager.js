@@ -1,7 +1,7 @@
 (() => {
     'use strict';
-    const FIELDS = ['company','collected_at','published_at_raw','estimated_publish_date','publish_date','post_text_raw','post_text','hashtags','content_topic','post_url','reactions','comments','reposts','media_type'];
-    const EXPORT_FIELDS = ['company','collected_at','publish_date','post_text','hashtags','content_topic','post_url','reactions','comments','reposts','media_type'];
+    const FIELDS = ['company','collected_at','published_at_raw','estimated_publish_date','publish_date','post_text_raw','post_text','hashtags','content_topic','reactions','comments','reposts','media_type'];
+    const EXPORT_FIELDS = ['company','collected_at','publish_date','post_text','hashtags','content_topic','reactions','comments','reposts','media_type'];
     const TOPICS = [
       ['product_solution','产品与解决方案'], ['event','展会与活动'], ['customer_case','客户案例'],
       ['industry_insight','行业洞察'], ['partnership','合作伙伴'], ['brand_news','品牌与企业动态'],
@@ -30,7 +30,7 @@
     const fmt = value => new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(value || 0);
     const validDate = value => /^\d{4}-\d{2}-\d{2}/.test(clean(value)) ? clean(value).slice(0,10) : '';
     const tagsOf = row => clean(row.hashtags).split(/\s+/).filter(Boolean);
-    const keyOf = row => clean(row.post_url) || `${clean(row.publish_date || row.estimated_publish_date || row.published_at_raw || row.post_date_raw || row.post_date)}|${clean(row.post_text).slice(0,180)}`;
+    const keyOf = row => `${clean(row.publish_date || row.estimated_publish_date || row.published_at_raw || row.post_date_raw || row.post_date)}|${clean(row.post_text).slice(0,180)}`;
     const splitPostText = value => {
       const raw = clean(value), tags = [...new Set(raw.match(/#[\p{L}\p{N}_-]+/gu) || [])];
       return { raw, text: clean(raw.replace(/#[\p{L}\p{N}_-]+/gu,' ')), hashtags: tags.join(' ') };
@@ -73,7 +73,6 @@
       if (!out.quality_status) {
         const notes = [];
         if (!clean(out.post_text)) notes.push('正文缺失');
-        if (!clean(out.post_url)) notes.push('永久链接缺失');
         if (!clean(out.publish_date || out.published_at_raw)) notes.push('日期缺失');
         if (!clean(out.media_type) || out.media_type === 'unknown') notes.push('媒体类型未知');
         out.quality_status = notes.length ? 'review' : 'ok'; out.quality_notes = notes.join('；');
@@ -230,7 +229,7 @@
 
     function renderTable(inputRows=filteredRows()) {
       const rows = [...inputRows].sort((a,b) => score(b)-score(a)); $('visibleCount').textContent = `${rows.length} 条`;
-      $('postRows').innerHTML = rows.length ? rows.slice(0,500).map(r => `<tr><td><b>${esc(r.company)}</b></td><td>${esc(r.estimated_publish_date||r.published_at_raw)}</td><td class="post-text">${esc(clean(r.post_text).slice(0,360))}</td><td>${esc(r.hashtags)}</td><td><select class="topic-select" data-topic-key="${esc(keyOf(r))}" aria-label="修正内容主题">${topicOptions(r.content_topic)}</select></td><td>${fmt(number(r.reactions))}</td><td>${fmt(number(r.comments))}</td><td>${fmt(number(r.reposts))}</td><td>${esc(r.media_type||'unknown')}</td><td>${r.post_url?`<a class="post-link" href="${esc(r.post_url)}" target="_blank" rel="noreferrer">打开</a>`:''}</td></tr>`).join('') : '<tr><td colspan="10"><div class="empty">没有符合筛选条件的帖子</div></td></tr>';
+      $('postRows').innerHTML = rows.length ? rows.slice(0,500).map(r => `<tr><td><b>${esc(r.company)}</b></td><td>${esc(r.estimated_publish_date||r.published_at_raw)}</td><td class="post-text">${esc(clean(r.post_text).slice(0,360))}</td><td>${esc(r.hashtags)}</td><td><select class="topic-select" data-topic-key="${esc(keyOf(r))}" aria-label="修正内容主题">${topicOptions(r.content_topic)}</select></td><td>${fmt(number(r.reactions))}</td><td>${fmt(number(r.comments))}</td><td>${fmt(number(r.reposts))}</td><td>${esc(r.media_type||'unknown')}</td></tr>`).join('') : '<tr><td colspan="9"><div class="empty">没有符合筛选条件的帖子</div></td></tr>';
     }
 
     function csvValue(value) { return `"${String(value??'').replace(/"/g,'""')}"`; }

@@ -58,9 +58,8 @@
   const first = (root, list) => list.map(s => root.querySelector(s)).find(Boolean) || null;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const randomWait = config => sleep(config.minWaitMs + Math.random() * (config.maxWaitMs - config.minWaitMs));
-  const keyOf = row => row.post_url || `${row.publish_date || row.published_at_raw || row.estimated_publish_date || row.post_date_raw || row.post_date || ''}|${String(row.post_text || '').slice(0,180)}`;
+  const keyOf = row => `${row.publish_date || row.published_at_raw || row.estimated_publish_date || row.post_date_raw || row.post_date || ''}|${String(row.post_text || '').slice(0,180)}`;
   const VIDEO_UI_RE = /Video Player|Play Video|Skip Backward|Skip Forward|Current Time|Duration|Stream Type|Playback Rate|subtitles settings|Audio Track|Picture-in-Picture|Fullscreen|Caption Area|End of dialog window/i;
-  const permalinkCache = new WeakMap();
 
   function actionLabel(node) {
     return clean([
@@ -212,67 +211,8 @@
     });
   }
 
-  function activityIdOf(row) {
-    const match=String(row?.post_url||'').match(/urn:li:activity:(\d+)/);
-    return match ? match[1] : '';
-  }
-
-  function activityRefOf(post) {
-    const nodes=[post,...post.querySelectorAll('*')];
-    for(const node of nodes)for(const attr of node.attributes||[]){
-      let value=String(attr.value||'');
-      try{value=decodeURIComponent(value);}catch{}
-      const urn=value.match(/urn:li:(activity|ugcPost):(\d+)/i);
-      if(urn)return {type:urn[1],id:urn[2]};
-      const slug=value.match(/(?:^|[-_/])(activity)-(\d{12,})(?:$|[?&#/])/i);
-      if(slug)return {type:'activity',id:slug[2]};
-    }
-    return null;
-  }
-
-  function capturedLink(timeout=900) {
-    return new Promise(resolve=>{
-      let timer;
-      const receive=event=>{
-        if(event.source!==window||event.data?.source!=='signalscope-page'||event.data?.type!=='captured-post-link')return;
-        clearTimeout(timer);window.removeEventListener('message',receive);resolve(clean(event.data.value));
-      };
-      window.addEventListener('message',receive);
-      timer=setTimeout(()=>{window.removeEventListener('message',receive);resolve('');},timeout);
-    });
-  }
-
-  async function permalinkFromMenu(post) {
-    if(permalinkCache.has(post))return permalinkCache.get(post);
-    const task=(async()=>{
-      const controls=[...post.querySelectorAll('button,[role="button"]')];
-      const menuButton=controls.find(node=>/动态控制菜单|post control menu|open.*control menu/i.test(actionLabel(node)));
-      if(!menuButton)return '';
-      try{
-        menuButton.click();await sleep(130);
-        const menuItems=[...document.querySelectorAll('[role="menuitem"],button,[role="button"]')].filter(node=>{
-          const rect=node.getBoundingClientRect();return rect.width>0&&rect.height>0;
-        });
-        const copyItem=menuItems.find(node=>/复制动态链接|复制帖子链接|copy link to (?:post|update)/i.test(actionLabel(node)));
-        if(!copyItem){menuButton.click();return '';}
-        for(const attr of copyItem.attributes||[]){
-          const value=clean(attr.value);if(/^https:\/\/(?:www\.)?linkedin\.com\/(?:feed\/update|posts\/)/i.test(value))return value;
-        }
-        const result=capturedLink();
-        window.dispatchEvent(new CustomEvent('signalscope-arm-link-capture'));
-        copyItem.click();
-        return await result;
-      }catch{return '';}
-    })();
-    permalinkCache.set(post,task);return task;
-  }
-
-  function activityDate(id) {
-    try { return id ? new Date(Number(BigInt(id) >> 22n)).toISOString() : ''; } catch { return ''; }
-  }
-
   function publishDate(row) {
-    return activityDate(activityIdOf(row)).slice(0,10) || String(row?.publish_date || row?.estimated_publish_date || '').slice(0,10);
+    return String(row?.publish_date || row?.estimated_publish_date || '').slice(0,10);
   }
 
   function inDateRange(row, config) {
@@ -286,10 +226,7 @@
   }
 
   function oldestPost(rows) {
-    return rows.map(row=>({row,id:activityIdOf(row)})).sort((a,b)=>{
-      if(a.id&&b.id) return BigInt(a.id)<BigInt(b.id)?-1:BigInt(a.id)>BigInt(b.id)?1:0;
-      return String(a.row.estimated_publish_date||'9999').localeCompare(String(b.row.estimated_publish_date||'9999'));
-    })[0] || null;
+    return rows.map(row=>({row})).sort((a,b)=>String(publishDate(a.row)||'9999').localeCompare(String(publishDate(b.row)||'9999')))[0] || null;
   }
 
   function blockedReason() {
@@ -353,17 +290,13 @@
     return { date:new Date(new Date(collectedAt).getTime()-days*86400000).toISOString().slice(0,10), estimated:true };
   }
 
-  async function extract(post) {
+  function extract(post) {
     const dateLink=first(post,SELECTORS.dateLink), dateEl=first(post,SELECTORS.date);
     const fallbackDate=clean(post.innerText).match(/(?:^|\s)(\d+\s*(?:分钟|小时|天|日|周|星期|个月|月|年|mins?|minutes?|hours?|days?|weeks?|months?|years?))(?:\s*[•·])/i)?.[1]||'';
     const textEl=meaningfulTextElement(post);
     const textParts=splitPostText(textOf(textEl));
     const rawDate=clean(dateEl?.getAttribute('datetime'))||textOf(dateEl)||fallbackDate||textOf(dateLink), collectedAt=new Date().toISOString(), normalized=estimateDate(rawDate,collectedAt);
-    const urn=post.getAttribute('data-urn')||post.getAttribute('data-id')||'', activity=urn.match(/urn:li:activity:\d+/)?.[0],activityRef=activityRefOf(post);
-    const href=dateLink?.href||dateLink?.closest('a')?.href||'';
-    const permanentHref=/\/feed\/update\/urn:li:activity:\d+|urn:li:activity:\d+|\/posts\/[^/?#]+-activity-\d+/i.test(href)?href:'';
-    const url=permanentHref||(activity?`https://www.linkedin.com/feed/update/${activity}/`:activityRef?`https://www.linkedin.com/feed/update/urn:li:${activityRef.type}:${activityRef.id}/`:await permalinkFromMenu(post));
-    return {company:companyName(),collected_at:collectedAt,published_at_raw:rawDate,estimated_publish_date:normalized.date,post_text_raw:textParts.raw,post_text:textParts.text,hashtags:textParts.hashtags,post_url:url,
+    return {company:companyName(),collected_at:collectedAt,published_at_raw:rawDate,estimated_publish_date:normalized.date,post_text_raw:textParts.raw,post_text:textParts.text,hashtags:textParts.hashtags,
       reactions:countFrom(post,SELECTORS.reactions,/\d[\d,.]*\s*(?:次回应|reactions?|likes?|赞)/i),comments:countFrom(post,SELECTORS.comments,/\d[\d,.]*\s*(?:条?评论|comments?)/i),reposts:countFrom(post,SELECTORS.reposts,/\d[\d,.]*\s*(?:次?重新发布|次?转发|reposts?|shares?)/i),media_type:mediaType(post)};
   }
 
@@ -413,7 +346,7 @@
         const label=textOf(button)||clean(button.getAttribute('aria-label'));
         if(/see more|查看更多|显示更多|…more/i.test(label)&&!button.disabled)try{button.click();await sleep(200);}catch(error){errors.push(String(error));}
       }
-      for(const post of currentPosts)try{const row=await extract(post),key=keyOf(row),date=publishDate(row);if(!key)continue;if(historyKeys.has(key))reached=true;else if(!collected.has(key))collected.set(key,row);if(direction==='down'&&config.startDate&&date&&date<config.startDate)dateReached=true;}catch(error){errors.push(String(error));}
+      for(const post of currentPosts)try{const row=extract(post),key=keyOf(row),date=publishDate(row);if(!key)continue;if(historyKeys.has(key))reached=true;else if(!collected.has(key))collected.set(key,row);if(direction==='down'&&config.startDate&&date&&date<config.startDate)dateReached=true;}catch(error){errors.push(String(error));}
       const added=collected.size-previous;
       const scroll=scrollController(),height=scroll.height;
       const moved=previousScrollTop<0||Math.abs(scroll.top-previousScrollTop)>4;
@@ -428,7 +361,7 @@
       bottomRounds=direction==='down'&&scroll.top+scroll.viewport>=height-24?bottomRounds+1:0;
       rounds.push({round:scrollRounds,posts:collected.size,added,page_height:height,idle_count:idle,at:new Date().toISOString()});
       const oldest=oldestPost([...collected.values()]);
-      const oldestLabel=oldest?(activityDate(oldest.id).slice(0,10)||oldest.row.estimated_publish_date||oldest.row.published_at_raw||'日期未知'):'尚未识别';
+      const oldestLabel=oldest?(publishDate(oldest.row)||oldest.row.published_at_raw||'日期未知'):'尚未识别';
       metrics.innerHTML=`${direction==='up'?'向上':'向下'}滚动 ${scrollRounds} 次 · 本轮 +${added}<br>当前最早 ${oldestLabel} · 底部确认 ${Math.min(bottomRounds,3)}/3`;
       status.textContent=reached?'已遇到历史记录，准备导出…':idle?`已到加载边界，正在等待更多（${idle}/${config.maxIdleScrolls}）`:config.mode==='stable'?'正在稳定滚动并采集…':'正在快速滚动并采集…';
       if(reached){stopReason='history_boundary';break;}
@@ -439,8 +372,8 @@
     }
     if(!stopReason) stopReason=!unlimited&&[...collected.values()].filter(row=>inDateRange(row,config)).length>=config.maxPosts?'target_reached':reached?'history_boundary':idle>=config.maxIdleScrolls?(config.scanMode==='earliest'&&bottomRounds>=3&&stableHeightRounds>=3?'oldest_boundary':'no_new_content'):'user_stopped';
     const matchingRows=[...collected.values()].filter(row=>inDateRange(row,config));
-    const rows=matchingRows.slice(0,unlimited?undefined:config.maxPosts), fields=['company','collected_at','publish_date','post_text','hashtags','post_url','reactions','comments','reposts','media_type'];
-    const exportRows=rows.map(row=>({company:row.company,collected_at:row.collected_at,publish_date:publishDate(row),post_text:row.post_text,hashtags:row.hashtags,post_url:row.post_url,reactions:row.reactions,comments:row.comments,reposts:row.reposts,media_type:row.media_type}));
+    const rows=matchingRows.slice(0,unlimited?undefined:config.maxPosts), fields=['company','collected_at','publish_date','post_text','hashtags','reactions','comments','reposts','media_type'];
+    const exportRows=rows.map(row=>({company:row.company,collected_at:row.collected_at,publish_date:publishDate(row),post_text:row.post_text,hashtags:row.hashtags,reactions:row.reactions,comments:row.comments,reposts:row.reposts,media_type:row.media_type}));
     const stamp=new Date().toISOString().slice(0,10),fileAlias=config.companyAlias||slug;
     const csv=[fields.join(','),...exportRows.map(row=>fields.map(f=>csvValue(row[f])).join(','))].join('\r\n');
     if (!rows.length) {
@@ -454,7 +387,7 @@
     }
     const oldest=oldestPost(rows);
     const confidence=stopReason==='oldest_boundary'?'high':['date_boundary','top_boundary','history_boundary'].includes(stopReason)?'medium':'low';
-    const metadata={schema_version:'2.5-extension',source_url:location.href,company:companyName(),company_alias:fileAlias,requested_max:unlimited?null:config.maxPosts,collected_count:rows.length,scanned_count:collected.size,capture_mode:config.mode,scan_mode:config.scanMode,scan_direction:direction,date_range:{start:config.startDate||null,end:config.endDate||null},stop_reason:stopReason,stop_label:stopLabel(stopReason),boundary_confirmed:confidence==='high',boundary_confidence:confidence,boundary_evidence:{bottom_rounds:bottomRounds,stable_height_rounds:stableHeightRounds,idle_rounds:idle},resumed_from_checkpoint:resumePosts.length>0,oldest_post:oldest?{post_url:oldest.row.post_url,activity_id:oldest.id,published_at:activityDate(oldest.id)||oldest.row.estimated_publish_date||oldest.row.published_at_raw,post_text:oldest.row.post_text}:null,scroll_rounds:scrollRounds,incremental_mode:historyKeys.size>0,history_count:historyKeys.size,reached_history_boundary:reached,stopped_by_user:stop,generated_at:new Date().toISOString(),error_count:errors.length};
+    const metadata={schema_version:'2.6-extension',source_url:location.href,company:companyName(),company_alias:fileAlias,requested_max:unlimited?null:config.maxPosts,collected_count:rows.length,scanned_count:collected.size,capture_mode:config.mode,scan_mode:config.scanMode,scan_direction:direction,date_range:{start:config.startDate||null,end:config.endDate||null},stop_reason:stopReason,stop_label:stopLabel(stopReason),boundary_confirmed:confidence==='high',boundary_confidence:confidence,boundary_evidence:{bottom_rounds:bottomRounds,stable_height_rounds:stableHeightRounds,idle_rounds:idle},resumed_from_checkpoint:resumePosts.length>0,oldest_post:oldest?{published_at:publishDate(oldest.row)||oldest.row.published_at_raw,post_text:oldest.row.post_text}:null,scroll_rounds:scrollRounds,incremental_mode:historyKeys.size>0,history_count:historyKeys.size,reached_history_boundary:reached,stopped_by_user:stop,generated_at:new Date().toISOString(),error_count:errors.length};
     const csvSaved=await download(`${fileAlias}-${stamp}.csv`,csv,'text/csv;charset=utf-8',true);
     const jsonSaved=await download(`${fileAlias}-${stamp}.json`,JSON.stringify({metadata,posts:exportRows},null,2),'application/json;charset=utf-8');
     let master=null;

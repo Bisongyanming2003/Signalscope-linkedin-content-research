@@ -1,2 +1,2 @@
-﻿company,collected_at,published_at_raw,estimated_publish_date,post_text_raw,post_text,hashtags,content_topic,post_url,reactions,comments,reposts,media_type
-示例公司,2026-07-13T08:00:00.000Z,1周前,2026-07-06,"这是一条储能解决方案示例文案。 #SolarEnergy #储能","这是一条储能解决方案示例文案。","#SolarEnergy #储能",product_solution,https://www.linkedin.com/feed/update/urn:li:activity:0000000000000000000/,1200,18,3,image
+﻿company,collected_at,publish_date,post_text,hashtags,content_topic,reactions,comments,reposts,media_type
+示例公司,2026-07-13T08:00:00.000Z,2026-07-06,"这是一条储能解决方案示例文案。","#SolarEnergy #储能",product_solution,1200,18,3,image

@@ -70,12 +70,12 @@ async function readJson(folder, name) {
 }
 
 const clean = value => String(value ?? '').replace(/\s+/g,' ').trim();
-const postKey = row => clean(row.post_url) || `${clean(row.publish_date || row.published_at_raw || row.estimated_publish_date)}|${clean(row.post_text).slice(0,180)}`;
+const postKey = row => `${clean(row.publish_date || row.published_at_raw || row.estimated_publish_date)}|${clean(row.post_text).slice(0,180)}`;
 const csvValue = value => `"${String(value ?? '').replace(/"/g,'""')}"`;
 const cleanExportPost = row => ({
   company:clean(row.company),collected_at:clean(row.collected_at),
   publish_date:clean(row.publish_date||row.estimated_publish_date||row.published_date_estimated||row.post_date_estimated),
-  post_text:clean(row.post_text||row.post_text_raw),hashtags:clean(row.hashtags),post_url:clean(row.post_url),
+  post_text:clean(row.post_text||row.post_text_raw),hashtags:clean(row.hashtags),
   reactions:row.reactions??'',comments:row.comments??'',reposts:row.reposts??'',media_type:clean(row.media_type)
 });
 
@@ -98,7 +98,7 @@ async function updateMaster(alias, incomingPosts, batchMetadata) {
   const posts=[...merged.values()].sort((a,b)=>String(b.publish_date||'').localeCompare(String(a.publish_date||'')));
   const dates=posts.map(row=>clean(row.publish_date)).filter(date=>/^\d{4}-\d{2}-\d{2}$/.test(date)).sort();
   const metadata={schema_version:'2.0-master',company_alias:safeAlias,collected_count:posts.length,previous_count:previous.length,added_count:Math.max(0,posts.length-previous.length),batch_count:Number(existing?.metadata?.batch_count||0)+1,coverage:{earliest:dates[0]||null,latest:dates.at(-1)||null,empty_months:missingMonths(dates)},last_batch:batchMetadata||null,updated_at:new Date().toISOString()};
-  const fields=['company','collected_at','publish_date','post_text','hashtags','post_url','reactions','comments','reposts','media_type'];
+  const fields=['company','collected_at','publish_date','post_text','hashtags','reactions','comments','reposts','media_type'];
   const csv=[fields.join(','),...posts.map(row=>fields.map(field=>csvValue(row[field])).join(','))].join('\r\n');
   await writeExact(folder,jsonName,JSON.stringify({metadata,posts},null,2));
   await writeExact(folder,csvName,`\uFEFF${csv}`);

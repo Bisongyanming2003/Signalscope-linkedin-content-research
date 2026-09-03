@@ -175,12 +175,8 @@
   function extract(post, index) {
     try {
       const textParts = splitPostText(textOf(first(post, SELECTORS.text)));
-      const dateLink = first(post, SELECTORS.dateLink);
       const dateEl = first(post, SELECTORS.date);
-      const href = dateLink?.href || dateLink?.closest('a')?.href || '';
-      const urn = post.getAttribute('data-urn') || post.getAttribute('data-id') || '';
-      const activity = urn.match(/urn:li:activity:\d+/)?.[0];
-      const postUrl = href || (activity ? `https://www.linkedin.com/feed/update/${activity}/` : '');
+      const dateLink = first(post, SELECTORS.dateLink);
       const collectedAt = new Date().toISOString();
       const rawDate = clean(dateEl?.getAttribute('datetime')) || textOf(dateEl) || textOf(dateLink);
       const normalizedDate = estimateDate(rawDate, collectedAt);
@@ -192,7 +188,6 @@
         post_text_raw: textParts.raw,
         post_text: textParts.text,
         hashtags: textParts.hashtags,
-        post_url: postUrl,
         reactions: countFrom(post, SELECTORS.reactions, /reaction|回应|赞|like/i),
         comments: countFrom(post, SELECTORS.comments, /comment|评论/i),
         reposts: countFrom(post, SELECTORS.reposts, /repost|share|转发|分享/i),
@@ -207,7 +202,7 @@
   function dedupe(items) {
     const seen = new Set();
     return items.filter(item => {
-      const key = item.post_url || `${item.published_at_raw || item.post_date_raw || item.post_date || ''}|${item.post_text.slice(0, 100)}`;
+      const key = `${item.published_at_raw || item.post_date_raw || item.post_date || ''}|${item.post_text.slice(0, 100)}`;
       if (!key.replace('|', '')) return false;
       if (seen.has(key)) return false;
       seen.add(key);
@@ -216,7 +211,7 @@
   }
 
   function dedupeKey(item) {
-    return item.post_url || `${item.published_at_raw || item.post_date_raw || item.post_date || ''}|${String(item.post_text || '').slice(0, 100)}`;
+    return `${item.published_at_raw || item.post_date_raw || item.post_date || ''}|${String(item.post_text || '').slice(0, 100)}`;
   }
 
   async function readHistoryFile(file) {
@@ -315,7 +310,7 @@
   }
 
   const rows = [...collected.values()].slice(0, LINKEDIN_AUDIT_CONFIG_20260713.maxPosts);
-  const fields = ['company','collected_at','published_at_raw','estimated_publish_date','post_text_raw','post_text','hashtags','post_url','reactions','comments','reposts','media_type'];
+  const fields = ['company','collected_at','published_at_raw','estimated_publish_date','post_text_raw','post_text','hashtags','reactions','comments','reposts','media_type'];
   const missing = Object.fromEntries(fields.map(f => [f, rows.filter(r => r[f] === '' || r[f] == null).length]));
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const slug = location.pathname.match(/^\/company\/([^/]+)/)?.[1] || 'linkedin';

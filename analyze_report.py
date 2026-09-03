@@ -80,7 +80,7 @@ def render(input_path: Path, rows: list[dict[str, Any]]) -> str:
         media[str(row.get("media_type") or "unknown")].append(row)
     media_stats = sorted(((name, len(items), mean(score(r) for r in items)) for name, items in media.items()), key=lambda x: x[2], reverse=True)
     top = sorted(rows, key=score, reverse=True)[:15]
-    quality_review = sum(not r.get("post_text") or not r.get("post_url") or not (r.get("estimated_publish_date") or r.get("published_at_raw")) for r in rows)
+    quality_review = sum(not r.get("post_text") or not (r.get("publish_date") or r.get("estimated_publish_date") or r.get("published_at_raw")) for r in rows)
     keyword_stats = keywords(rows)
 
     company_rows = "".join(
@@ -90,13 +90,11 @@ def render(input_path: Path, rows: list[dict[str, Any]]) -> str:
     )
     media_rows = "".join(f"<tr><td>{html.escape(name)}</td><td>{count}</td><td>{fmt(avg)}</td></tr>" for name, count, avg in media_stats)
     def top_row(index: int, row: dict[str, Any]) -> str:
-        url = str(row.get("post_url") or "")
-        link = f"<a href='{html.escape(url, quote=True)}' target='_blank' rel='noreferrer'>打开</a>" if url else ""
         return (f"<tr><td>{index}</td><td>{html.escape(str(row.get('company', '')))}</td>"
-                f"<td>{html.escape(str(row.get('estimated_publish_date') or row.get('published_at_raw') or row.get('post_date_estimated') or row.get('post_date_raw') or row.get('post_date', '')))}</td>"
+                f"<td>{html.escape(str(row.get('publish_date') or row.get('estimated_publish_date') or row.get('published_at_raw') or row.get('post_date_estimated') or row.get('post_date_raw') or row.get('post_date', '')))}</td>"
                 f"<td class='post'>{html.escape(str(row.get('post_text', ''))[:260])}</td>"
                 f"<td>{html.escape(str(row.get('hashtags', '')))}</td>"
-                f"<td>{fmt(score(row))}</td><td>{link}</td></tr>")
+                f"<td>{fmt(score(row))}</td></tr>")
 
     top_rows = "".join(top_row(i, row) for i, row in enumerate(top, 1))
     tags = "".join(f"<span>{html.escape(word)} <b>{count}</b></span>" for word, count in keyword_stats)
@@ -109,7 +107,7 @@ def render(input_path: Path, rows: list[dict[str, Any]]) -> str:
 <section><h2>公司横向对比</h2><table><thead><tr><th>公司</th><th>帖子</th><th>平均点赞</th><th>平均评论</th><th>平均转发</th><th>平均加权互动</th><th>相对表现</th></tr></thead><tbody>{company_rows}</tbody></table><div class='note'>加权互动 = 点赞 + 评论×2 + 转发×3，仅用于快速内容比较，不代表官方互动率。</div></section>
 <section><h2>媒体类型表现</h2><table><thead><tr><th>类型</th><th>帖子数量</th><th>平均加权互动</th></tr></thead><tbody>{media_rows}</tbody></table></section>
 <section><h2>高频关键词与标签</h2><div class='tags'>{tags or '暂无可统计关键词'}</div><div class='note'>英文按词频统计，中文优先统计话题标签；该结果适合发现线索，不等同于语义主题分类。</div></section>
-<section><h2>表现最佳帖子 Top 15</h2><table><thead><tr><th>#</th><th>公司</th><th>日期</th><th>正文摘要</th><th>话题标签</th><th>加权互动</th><th>链接</th></tr></thead><tbody>{top_rows}</tbody></table></section>
+<section><h2>表现最佳帖子 Top 15</h2><table><thead><tr><th>#</th><th>公司</th><th>日期</th><th>正文摘要</th><th>话题标签</th><th>加权互动</th></tr></thead><tbody>{top_rows}</tbody></table></section>
 </main></body></html>"""
 
 

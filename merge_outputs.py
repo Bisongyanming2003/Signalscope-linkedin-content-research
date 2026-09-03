@@ -11,8 +11,8 @@ from typing import Any
 
 
 FIELDS = [
-    "company", "collected_at", "published_at_raw", "estimated_publish_date", "post_text_raw", "post_text",
-    "hashtags", "content_topic", "post_url", "reactions", "comments", "reposts", "media_type",
+    "company", "collected_at", "publish_date", "post_text", "hashtags", "content_topic",
+    "reactions", "comments", "reposts", "media_type",
 ]
 
 
@@ -20,7 +20,7 @@ def normalize(row: dict[str, Any], fallback_company: str = "") -> dict[str, Any]
     result = dict(row)
     result["company"] = result.get("company") or fallback_company
     result["published_at_raw"] = result.get("published_at_raw") or result.get("post_date_raw") or result.get("post_date") or ""
-    result["estimated_publish_date"] = result.get("estimated_publish_date") or result.get("published_date_estimated") or result.get("post_date_estimated") or ""
+    result["publish_date"] = result.get("publish_date") or result.get("estimated_publish_date") or result.get("published_date_estimated") or result.get("post_date_estimated") or ""
     raw = str(result.get("post_text_raw") or result.get("post_text") or "")
     tags = list(dict.fromkeys(re.findall(r"#[\w\-]+", raw, re.UNICODE)))
     result["post_text_raw"] = result.get("post_text_raw") or raw
@@ -44,7 +44,7 @@ def read_rows(path: Path) -> list[dict[str, Any]]:
 
 
 def key(row: dict[str, Any]) -> str:
-    return str(row.get("post_url") or f"{row.get('published_at_raw') or row.get('post_date_raw') or row.get('post_date', '')}|{str(row.get('post_text', ''))[:100]}")
+    return f"{row.get('publish_date') or row.get('estimated_publish_date') or row.get('published_at_raw') or row.get('post_date_raw') or row.get('post_date', '')}|{str(row.get('post_text', ''))[:100]}"
 
 
 def main() -> None:

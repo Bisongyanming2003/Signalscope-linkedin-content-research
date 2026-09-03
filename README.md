@@ -67,7 +67,7 @@ https://www.linkedin.com/company/company-name/posts/?feedView=all
 
 点击扩展弹窗底部的 **打开研究台**，然后拖入刚生成的 CSV 或 JSON。研究台会自动：
 
-- 合并多个批次并按帖子链接去重
+- 合并多个批次并按发布日期与正文去重
 - 显示平均互动量和中位互动量
 - 比较公司、主题和媒体类型
 - 分析发布节奏与话题标签
@@ -111,7 +111,7 @@ JSON 元数据中的 `boundary_confidence` 表示停止边界的可信度：
 - `medium`：到达日期边界、历史文件边界或页面顶部
 - `low`：用户停止、访问受限，或页面停止加载但尚未充分确认到底
 
-正式研究前，建议抽查最早和最晚的几篇帖子，并检查正文、日期、永久链接和互动数字。
+正式研究前，建议抽查最早和最晚的几篇帖子，并检查正文、日期和互动数字。
 
 ## 常见问题
 
@@ -143,7 +143,7 @@ SignalScope 生成的 CSV 带 UTF-8 BOM。若仍有乱码，请在 Excel 中使�
 
 ### 日期为什么是估计值
 
-LinkedIn 经常只显示 `2d`、`3周` 等相对时间。`publish_date` 是根据采集时间换算的日期，不应视为官方精确发布时间。能够从 Activity ID 解析时间时，扩展会优先使用该信息辅助排序。
+LinkedIn 经常只显示 `2d`、`3周` 等相对时间。`publish_date` 是根据采集时间换算的日期，不应视为官方精确发布时间。
 
 ## 数据字段
 
@@ -155,7 +155,6 @@ collected_at
 publish_date
 post_text
 hashtags
-post_url
 reactions
 comments
 reposts
