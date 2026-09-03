@@ -1,6 +1,7 @@
 (() => {
     'use strict';
-    const FIELDS = ['company','collected_at','published_at_raw','estimated_publish_date','post_text_raw','post_text','hashtags','content_topic','post_url','reactions','comments','reposts','media_type'];
+    const FIELDS = ['company','collected_at','published_at_raw','estimated_publish_date','publish_date','post_text_raw','post_text','hashtags','content_topic','post_url','reactions','comments','reposts','media_type'];
+    const EXPORT_FIELDS = ['company','collected_at','publish_date','post_text','hashtags','content_topic','post_url','reactions','comments','reposts','media_type'];
     const TOPICS = [
       ['product_solution','产品与解决方案'], ['event','展会与活动'], ['customer_case','客户案例'],
       ['industry_insight','行业洞察'], ['partnership','合作伙伴'], ['brand_news','品牌与企业动态'],
@@ -29,7 +30,7 @@
     const fmt = value => new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(value || 0);
     const validDate = value => /^\d{4}-\d{2}-\d{2}/.test(clean(value)) ? clean(value).slice(0,10) : '';
     const tagsOf = row => clean(row.hashtags).split(/\s+/).filter(Boolean);
-    const keyOf = row => clean(row.post_url) || `${clean(row.published_at_raw || row.post_date_raw || row.post_date)}|${clean(row.post_text).slice(0,100)}`;
+    const keyOf = row => clean(row.post_url) || `${clean(row.publish_date || row.estimated_publish_date || row.published_at_raw || row.post_date_raw || row.post_date)}|${clean(row.post_text).slice(0,180)}`;
     const splitPostText = value => {
       const raw = clean(value), tags = [...new Set(raw.match(/#[\p{L}\p{N}_-]+/gu) || [])];
       return { raw, text: clean(raw.replace(/#[\p{L}\p{N}_-]+/gu,' ')), hashtags: tags.join(' ') };
@@ -62,7 +63,8 @@
       const out = {}; FIELDS.forEach(field => out[field] = row[field] ?? '');
       out.company = out.company || fallbackCompany;
       out.published_at_raw = out.published_at_raw || row.post_date_raw || row.post_date || '';
-      out.estimated_publish_date = out.estimated_publish_date || row.published_date_estimated || row.post_date_estimated || '';
+      out.publish_date = out.publish_date || out.estimated_publish_date || row.published_date_estimated || row.post_date_estimated || '';
+      out.estimated_publish_date = out.publish_date;
       const parts = splitPostText(out.post_text_raw || out.post_text);
       out.post_text_raw = out.post_text_raw || parts.raw;
       out.hashtags = out.hashtags || parts.hashtags;
@@ -72,7 +74,7 @@
         const notes = [];
         if (!clean(out.post_text)) notes.push('正文缺失');
         if (!clean(out.post_url)) notes.push('永久链接缺失');
-        if (!clean(out.published_at_raw)) notes.push('日期缺失');
+        if (!clean(out.publish_date || out.published_at_raw)) notes.push('日期缺失');
         if (!clean(out.media_type) || out.media_type === 'unknown') notes.push('媒体类型未知');
         out.quality_status = notes.length ? 'review' : 'ok'; out.quality_notes = notes.join('；');
       }
@@ -234,10 +236,10 @@
     function csvValue(value) { return `"${String(value??'').replace(/"/g,'""')}"`; }
     function download(name, content, type, bom=false) { const blob=new Blob([bom?'\uFEFF':'',content],{type}); const url=URL.createObjectURL(blob); const a=Object.assign(document.createElement('a'),{href:url,download:name}); a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); }
     function stamp() { return new Date().toISOString().slice(0,10); }
-    function csvFrom(rows) { return [FIELDS.join(','),...rows.map(r=>FIELDS.map(f=>csvValue(r[f])).join(','))].join('\r\n'); }
+    function csvFrom(rows) { return [EXPORT_FIELDS.join(','),...rows.map(r=>EXPORT_FIELDS.map(f=>csvValue(r[f])).join(','))].join('\r\n'); }
     function exportCsv() { const rows=[...state.rows.values()]; download(`linkedin-research-all-${stamp()}.csv`,csvFrom(rows),'text/csv;charset=utf-8',true); }
     function exportFilteredCsv() { const rows=filteredRows(); download(`linkedin-research-filtered-${stamp()}.csv`,csvFrom(rows),'text/csv;charset=utf-8',true); notify(`已下载当前筛选的 ${rows.length} 条帖子。`); }
-    function exportJson() { const posts=[...state.rows.values()].map(row=>Object.fromEntries(FIELDS.map(field=>[field,row[field]??'']))); const data={metadata:{schema_version:'2.4',generated_at:new Date().toISOString(),collected_count:posts.length,batch_count:state.batches.length},posts}; download(`linkedin-all-companies-${stamp()}.json`,JSON.stringify(data,null,2),'application/json;charset=utf-8'); }
+    function exportJson() { const posts=[...state.rows.values()].map(row=>Object.fromEntries(EXPORT_FIELDS.map(field=>[field,row[field]??'']))); const data={metadata:{schema_version:'2.5',generated_at:new Date().toISOString(),collected_count:posts.length,batch_count:state.batches.length},posts}; download(`linkedin-all-companies-${stamp()}.json`,JSON.stringify(data,null,2),'application/json;charset=utf-8'); }
 
     function reportHtml() {
       const rows=filteredRows(), companies=[...grouped(rows,'company')].map(([name,items])=>({name,count:items.length,avg:average(items)})).sort((a,b)=>b.avg-a.avg), topics=[...grouped(rows,'content_topic')].map(([name,items])=>({name,count:items.length,avg:average(items),median:median(items.map(interactions))})).sort((a,b)=>b.avg-a.avg), top=[...rows].sort((a,b)=>score(b)-score(a)).slice(0,20);
@@ -263,4 +265,3 @@
     $('clearData').addEventListener('click',()=>{if(confirm('清空当前页面中的所有导入数据？')){state.rows.clear();state.duplicates=0;state.batches=[];$('fileInput').value='';render();notify('当前研究集已清空。');}});
     render();
   })();
-

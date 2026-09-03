@@ -143,7 +143,7 @@ SignalScope 生成的 CSV 带 UTF-8 BOM。若仍有乱码，请在 Excel 中使�
 
 ### 日期为什么是估计值
 
-LinkedIn 经常只显示 `2d`、`3周` 等相对时间。`published_at_raw` 保存页面原文，`estimated_publish_date` 是根据采集时间换算的日期，不应视为官方精确发布时间。能够从 Activity ID 解析时间时，扩展会优先使用该信息辅助排序。
+LinkedIn 经常只显示 `2d`、`3周` 等相对时间。`publish_date` 是根据采集时间换算的日期，不应视为官方精确发布时间。能够从 Activity ID 解析时间时，扩展会优先使用该信息辅助排序。
 
 ## 数据字段
 
@@ -152,9 +152,7 @@ CSV 与 JSON 中的帖子字段包括：
 ```text
 company
 collected_at
-published_at_raw
-estimated_publish_date
-post_text_raw
+publish_date
 post_text
 hashtags
 post_url

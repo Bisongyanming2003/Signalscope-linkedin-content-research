@@ -58,7 +58,7 @@
   const first = (root, list) => list.map(s => root.querySelector(s)).find(Boolean) || null;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const randomWait = config => sleep(config.minWaitMs + Math.random() * (config.maxWaitMs - config.minWaitMs));
-  const keyOf = row => row.post_url || `${row.published_at_raw || row.post_date_raw || row.post_date || ''}|${String(row.post_text || '').slice(0,180)}`;
+  const keyOf = row => row.post_url || `${row.publish_date || row.published_at_raw || row.estimated_publish_date || row.post_date_raw || row.post_date || ''}|${String(row.post_text || '').slice(0,180)}`;
   const VIDEO_UI_RE = /Video Player|Play Video|Skip Backward|Skip Forward|Current Time|Duration|Stream Type|Playback Rate|subtitles settings|Audio Track|Picture-in-Picture|Fullscreen|Caption Area|End of dialog window/i;
 
   function actionLabel(node) {
@@ -216,12 +216,25 @@
     return match ? match[1] : '';
   }
 
+  function activityRefOf(post) {
+    const nodes=[post,...post.querySelectorAll('*')];
+    for(const node of nodes)for(const attr of node.attributes||[]){
+      let value=String(attr.value||'');
+      try{value=decodeURIComponent(value);}catch{}
+      const urn=value.match(/urn:li:(activity|ugcPost):(\d+)/i);
+      if(urn)return {type:urn[1],id:urn[2]};
+      const slug=value.match(/(?:^|[-_/])(activity)-(\d{12,})(?:$|[?&#/])/i);
+      if(slug)return {type:'activity',id:slug[2]};
+    }
+    return null;
+  }
+
   function activityDate(id) {
     try { return id ? new Date(Number(BigInt(id) >> 22n)).toISOString() : ''; } catch { return ''; }
   }
 
   function publishDate(row) {
-    return activityDate(activityIdOf(row)).slice(0,10) || String(row?.estimated_publish_date || '').slice(0,10);
+    return activityDate(activityIdOf(row)).slice(0,10) || String(row?.publish_date || row?.estimated_publish_date || '').slice(0,10);
   }
 
   function inDateRange(row, config) {
@@ -308,10 +321,10 @@
     const textEl=meaningfulTextElement(post);
     const textParts=splitPostText(textOf(textEl));
     const rawDate=clean(dateEl?.getAttribute('datetime'))||textOf(dateEl)||fallbackDate||textOf(dateLink), collectedAt=new Date().toISOString(), normalized=estimateDate(rawDate,collectedAt);
-    const urn=post.getAttribute('data-urn')||post.getAttribute('data-id')||'', activity=urn.match(/urn:li:activity:\d+/)?.[0];
+    const urn=post.getAttribute('data-urn')||post.getAttribute('data-id')||'', activity=urn.match(/urn:li:activity:\d+/)?.[0],activityRef=activityRefOf(post);
     const href=dateLink?.href||dateLink?.closest('a')?.href||'';
     const permanentHref=/\/feed\/update\/urn:li:activity:\d+|urn:li:activity:\d+|\/posts\/[^/?#]+-activity-\d+/i.test(href)?href:'';
-    const url=permanentHref||(activity?`https://www.linkedin.com/feed/update/${activity}/`: '');
+    const url=permanentHref||(activity?`https://www.linkedin.com/feed/update/${activity}/`:activityRef?`https://www.linkedin.com/feed/update/urn:li:${activityRef.type}:${activityRef.id}/`:'');
     return {company:companyName(),collected_at:collectedAt,published_at_raw:rawDate,estimated_publish_date:normalized.date,post_text_raw:textParts.raw,post_text:textParts.text,hashtags:textParts.hashtags,post_url:url,
       reactions:countFrom(post,SELECTORS.reactions,/\d[\d,.]*\s*(?:次回应|reactions?|likes?|赞)/i),comments:countFrom(post,SELECTORS.comments,/\d[\d,.]*\s*(?:条?评论|comments?)/i),reposts:countFrom(post,SELECTORS.reposts,/\d[\d,.]*\s*(?:次?重新发布|次?转发|reposts?|shares?)/i),media_type:mediaType(post)};
   }
@@ -388,9 +401,10 @@
     }
     if(!stopReason) stopReason=!unlimited&&[...collected.values()].filter(row=>inDateRange(row,config)).length>=config.maxPosts?'target_reached':reached?'history_boundary':idle>=config.maxIdleScrolls?(config.scanMode==='earliest'&&bottomRounds>=3&&stableHeightRounds>=3?'oldest_boundary':'no_new_content'):'user_stopped';
     const matchingRows=[...collected.values()].filter(row=>inDateRange(row,config));
-    const rows=matchingRows.slice(0,unlimited?undefined:config.maxPosts), fields=['company','collected_at','published_at_raw','estimated_publish_date','post_text_raw','post_text','hashtags','post_url','reactions','comments','reposts','media_type'];
+    const rows=matchingRows.slice(0,unlimited?undefined:config.maxPosts), fields=['company','collected_at','publish_date','post_text','hashtags','post_url','reactions','comments','reposts','media_type'];
+    const exportRows=rows.map(row=>({company:row.company,collected_at:row.collected_at,publish_date:publishDate(row),post_text:row.post_text,hashtags:row.hashtags,post_url:row.post_url,reactions:row.reactions,comments:row.comments,reposts:row.reposts,media_type:row.media_type}));
     const stamp=new Date().toISOString().slice(0,10),fileAlias=config.companyAlias||slug;
-    const csv=[fields.join(','),...rows.map(row=>fields.map(f=>csvValue(row[f])).join(','))].join('\r\n');
+    const csv=[fields.join(','),...exportRows.map(row=>fields.map(f=>csvValue(row[f])).join(','))].join('\r\n');
     if (!rows.length) {
       stopReason=collected.size?'date_range_empty':'selector_not_found';panel.querySelector('[data-title]').textContent=collected.size?'日期范围内没有帖子':'SignalScope 未找到帖子';
       status.textContent=collected.size?'已扫描到帖子，但没有符合当前日期范围的结果。':'请确认帖子已经显示，刷新页面后重试。未生成空文件。';
@@ -404,9 +418,9 @@
     const confidence=stopReason==='oldest_boundary'?'high':['date_boundary','top_boundary','history_boundary'].includes(stopReason)?'medium':'low';
     const metadata={schema_version:'2.5-extension',source_url:location.href,company:companyName(),company_alias:fileAlias,requested_max:unlimited?null:config.maxPosts,collected_count:rows.length,scanned_count:collected.size,capture_mode:config.mode,scan_mode:config.scanMode,scan_direction:direction,date_range:{start:config.startDate||null,end:config.endDate||null},stop_reason:stopReason,stop_label:stopLabel(stopReason),boundary_confirmed:confidence==='high',boundary_confidence:confidence,boundary_evidence:{bottom_rounds:bottomRounds,stable_height_rounds:stableHeightRounds,idle_rounds:idle},resumed_from_checkpoint:resumePosts.length>0,oldest_post:oldest?{post_url:oldest.row.post_url,activity_id:oldest.id,published_at:activityDate(oldest.id)||oldest.row.estimated_publish_date||oldest.row.published_at_raw,post_text:oldest.row.post_text}:null,scroll_rounds:scrollRounds,incremental_mode:historyKeys.size>0,history_count:historyKeys.size,reached_history_boundary:reached,stopped_by_user:stop,generated_at:new Date().toISOString(),error_count:errors.length};
     const csvSaved=await download(`${fileAlias}-${stamp}.csv`,csv,'text/csv;charset=utf-8',true);
-    const jsonSaved=await download(`${fileAlias}-${stamp}.json`,JSON.stringify({metadata,posts:rows},null,2),'application/json;charset=utf-8');
+    const jsonSaved=await download(`${fileAlias}-${stamp}.json`,JSON.stringify({metadata,posts:exportRows},null,2),'application/json;charset=utf-8');
     let master=null;
-    if(csvSaved&&jsonSaved)try{master=await chrome.runtime.sendMessage({type:'SIGNAL_DESK_UPDATE_MASTER',alias:fileAlias,posts:rows,metadata});}catch{}
+    if(csvSaved&&jsonSaved)try{master=await chrome.runtime.sendMessage({type:'SIGNAL_DESK_UPDATE_MASTER',alias:fileAlias,posts:exportRows,metadata});}catch{}
     if(['target_reached','date_boundary','history_boundary','oldest_boundary','top_boundary'].includes(stopReason))try{await chrome.runtime.sendMessage({type:'SIGNAL_DESK_CLEAR_CHECKPOINT',slug});}catch{}
     else await saveCheckpoint(slug,[...collected.values()],config);
     panel.querySelector('[data-title]').textContent='SignalScope 采集结束';
