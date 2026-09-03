@@ -60,22 +60,36 @@
   const randomWait = config => sleep(config.minWaitMs + Math.random() * (config.maxWaitMs - config.minWaitMs));
   const keyOf = row => row.post_url || `${row.published_at_raw || row.post_date_raw || row.post_date || ''}|${String(row.post_text || '').slice(0,100)}`;
 
+  function actionLabel(node) {
+    return clean([
+      node.getAttribute?.('aria-label'),node.getAttribute?.('title'),
+      node.getAttribute?.('data-control-name'),node.getAttribute?.('data-view-name'),
+      node.innerText,node.textContent
+    ].filter(Boolean).join(' '));
+  }
+
+  function actionNodes(pattern) {
+    return [...document.querySelectorAll('button,a,[role="button"]')].filter(node=>pattern.test(actionLabel(node)));
+  }
+
   function heuristicPostCards() {
     // LinkedIn's newer company feed no longer exposes activity URNs on the
     // card. Locate each card from its repeated action row instead. Control-menu
     // labels change frequently, while comment/repost actions remain semantic.
     const anchors = [...new Set([
       ...document.querySelectorAll('button[aria-label*="动态控制菜单"],button[aria-label*="post control menu" i],button[aria-label*="control menu" i]'),
-      ...document.querySelectorAll('button[aria-label^="评论"],button[aria-label*="comment" i]'),
-      ...document.querySelectorAll('button[aria-label*="重新发布"],button[aria-label*="repost" i]')
+      ...actionNodes(/(?:^|\s)(?:评论|comment)(?:\s|$)/i),
+      ...actionNodes(/重新发布|repost/i),
+      ...[...document.querySelectorAll('h1,h2,h3,[role="heading"]')].filter(node=>/信息流动态|feed update/i.test(clean(node.textContent)))
     ])];
     const cards = [];
     for (const anchor of anchors) {
       let node = anchor.parentElement;
       for (let depth=0; node && node !== document.body && depth<14; depth++,node=node.parentElement) {
-        const hasComment = node.querySelector('button[aria-label^="评论"],button[aria-label*="comment" i]');
-        const hasRepost = node.querySelector('button[aria-label*="重新发布"],button[aria-label*="repost" i]');
-        const hasSend = node.querySelector('a[aria-label*="发送"],button[aria-label*="发送"],a[aria-label*="send" i],button[aria-label*="send" i]');
+        const controls=[...node.querySelectorAll('button,a,[role="button"]')].map(actionLabel);
+        const hasComment=controls.some(label=>/(?:^|\s)(?:评论|comment)(?:\s|$)/i.test(label));
+        const hasRepost=controls.some(label=>/重新发布|repost/i.test(label));
+        const hasSend=controls.some(label=>/(?:^|\s)(?:发送|send)(?:\s|$)/i.test(label));
         const text = clean(node.innerText);
         const hasDate = /(?:^|\s)\d+\s*(?:分钟|小时|天|日|周|星期|个月|月|年|mins?|minutes?|hours?|days?|weeks?|months?|years?)\s*[•·]/i.test(text);
         if (hasComment && hasRepost && (hasSend || hasDate) && hasDate && text.length > 40) { cards.push(node); break; }
@@ -124,8 +138,10 @@
     return {
       ...Object.fromEntries(SELECTORS.post.map(s=>[s,document.querySelectorAll(s).length])),
       heuristic_action_cards: heuristicPostCards().length,
-      comment_action_buttons: document.querySelectorAll('button[aria-label^="评论"],button[aria-label*="comment" i]').length,
-      repost_action_buttons: document.querySelectorAll('button[aria-label*="重新发布"],button[aria-label*="repost" i]').length
+      comment_action_buttons: actionNodes(/(?:^|\s)(?:评论|comment)(?:\s|$)/i).length,
+      repost_action_buttons: actionNodes(/重新发布|repost/i).length,
+      feed_update_headings: [...document.querySelectorAll('h1,h2,h3,[role="heading"]')].filter(node=>/信息流动态|feed update/i.test(clean(node.textContent))).length,
+      button_text_samples: [...document.querySelectorAll('button,[role="button"]')].map(actionLabel).filter(Boolean).slice(0,30)
     };
   }
 
