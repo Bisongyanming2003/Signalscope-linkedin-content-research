@@ -58,7 +58,8 @@
   const first = (root, list) => list.map(s => root.querySelector(s)).find(Boolean) || null;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const randomWait = config => sleep(config.minWaitMs + Math.random() * (config.maxWaitMs - config.minWaitMs));
-  const keyOf = row => row.post_url || `${row.published_at_raw || row.post_date_raw || row.post_date || ''}|${String(row.post_text || '').slice(0,100)}`;
+  const keyOf = row => row.post_url || `${row.published_at_raw || row.post_date_raw || row.post_date || ''}|${String(row.post_text || '').slice(0,180)}`;
+  const VIDEO_UI_RE = /Video Player|Play Video|Skip Backward|Skip Forward|Current Time|Duration|Stream Type|Playback Rate|subtitles settings|Audio Track|Picture-in-Picture|Fullscreen|Caption Area|End of dialog window/i;
 
   function actionLabel(node) {
     return clean([
@@ -256,13 +257,36 @@
 
   function countFrom(post, selectors, labelPattern) {
     const values = selectors.flatMap(s => [...post.querySelectorAll(s)]).flatMap(el => [textOf(el),clean(el.getAttribute('aria-label'))].filter(Boolean));
+    if (!values.some(v=>labelPattern.test(v))) {
+      values.push(...[...post.querySelectorAll('button,a,[role="button"]')].map(actionLabel).filter(Boolean));
+    }
     const numeric = values.filter(v => /\d/.test(v));
     return parseCount(numeric.find(v => labelPattern.test(v)) || numeric[0] || '');
   }
 
   function mediaType(post) {
-    for (const type of ['video','document','carousel','image','link']) if (SELECTORS.media[type].some(s => post.querySelector(s))) return type;
-    return first(post,SELECTORS.text) ? 'text' : 'unknown';
+    for (const type of ['video','document','carousel']) if (SELECTORS.media[type].some(s => post.querySelector(s))) return type;
+    const largeImage=[...post.querySelectorAll('img')].some(img=>{
+      const rect=img.getBoundingClientRect();
+      return rect.width>=180&&rect.height>=100&&!/profile|avatar|logo/i.test(clean(`${img.alt} ${img.className}`));
+    });
+    if(largeImage)return 'image';
+    if(post.querySelector('.update-components-article,.feed-shared-article,[data-test-id*="article"]'))return 'link';
+    return meaningfulTextElement(post) ? 'text' : 'unknown';
+  }
+
+  function meaningfulTextElement(post) {
+    const selectorMatches=SELECTORS.text.flatMap(selector=>[...post.querySelectorAll(selector)]);
+    const candidates=[...new Set([...selectorMatches,...post.querySelectorAll('p,span,div')])].filter(el=>{
+      const value=textOf(el), parentMedia=el.closest('video,[class*="video-player" i],[class*="video-js" i],[role="dialog"]');
+      return !parentMedia&&value.length>=30&&value.length<=12000&&el.children.length<=4&&!VIDEO_UI_RE.test(value)&&
+        !/位关注者|回应按钮状态|打开.*动态控制菜单|购买帐号\s*$/.test(value);
+    });
+    return candidates.sort((a,b)=>{
+      const av=textOf(a),bv=textOf(b);
+      const score=value=>(/(?:[.!?。！？]|#\p{L})/u.test(value)?5000:0)+Math.min(value.length,4500);
+      return score(bv)-score(av);
+    })[0]||null;
   }
 
   function companyName() {
@@ -281,15 +305,7 @@
   function extract(post) {
     const dateLink=first(post,SELECTORS.dateLink), dateEl=first(post,SELECTORS.date);
     const fallbackDate=clean(post.innerText).match(/(?:^|\s)(\d+\s*(?:分钟|小时|天|日|周|星期|个月|月|年|mins?|minutes?|hours?|days?|weeks?|months?|years?))(?:\s*[•·])/i)?.[1]||'';
-    let textEl=first(post,SELECTORS.text);
-    if(!textEl||textOf(textEl).length<30){
-      const selectorMatches=SELECTORS.text.flatMap(selector=>[...post.querySelectorAll(selector)]);
-      const candidates=[...new Set([...selectorMatches,...post.querySelectorAll('p,span,div')])].filter(el=>{
-        const value=textOf(el);
-        return value.length>=30&&el.children.length<=3&&!/位关注者|回应按钮状态|打开.*动态控制菜单/.test(value);
-      }).sort((a,b)=>textOf(b).length-textOf(a).length);
-      textEl=candidates[0]||null;
-    }
+    const textEl=meaningfulTextElement(post);
     const textParts=splitPostText(textOf(textEl));
     const rawDate=clean(dateEl?.getAttribute('datetime'))||textOf(dateEl)||fallbackDate||textOf(dateLink), collectedAt=new Date().toISOString(), normalized=estimateDate(rawDate,collectedAt);
     const urn=post.getAttribute('data-urn')||post.getAttribute('data-id')||'', activity=urn.match(/urn:li:activity:\d+/)?.[0];
@@ -297,7 +313,7 @@
     const permanentHref=/\/feed\/update\/urn:li:activity:\d+|urn:li:activity:\d+|\/posts\/[^/?#]+-activity-\d+/i.test(href)?href:'';
     const url=permanentHref||(activity?`https://www.linkedin.com/feed/update/${activity}/`: '');
     return {company:companyName(),collected_at:collectedAt,published_at_raw:rawDate,estimated_publish_date:normalized.date,post_text_raw:textParts.raw,post_text:textParts.text,hashtags:textParts.hashtags,post_url:url,
-      reactions:countFrom(post,SELECTORS.reactions,/reaction|回应|赞|like/i),comments:countFrom(post,SELECTORS.comments,/comment|评论/i),reposts:countFrom(post,SELECTORS.reposts,/repost|share|转发|分享/i),media_type:mediaType(post)};
+      reactions:countFrom(post,SELECTORS.reactions,/\d[\d,.]*\s*(?:次回应|reactions?|likes?|赞)/i),comments:countFrom(post,SELECTORS.comments,/\d[\d,.]*\s*(?:条?评论|comments?)/i),reposts:countFrom(post,SELECTORS.reposts,/\d[\d,.]*\s*(?:次?重新发布|次?转发|reposts?|shares?)/i),media_type:mediaType(post)};
   }
 
   function createPanel(config) {
