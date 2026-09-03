@@ -116,6 +116,7 @@ async function launch(posts, scanMode = 'limited', resumePosts = []) {
   $('resumeStart').disabled = true;
   showMessage('正在启动采集；进度面板会显示在 LinkedIn 页面右上角。');
   try {
+    await chrome.scripting.executeScript({ target: { tabId: activeTab.id }, world: 'MAIN', files: ['page-bridge.js'] });
     await chrome.scripting.executeScript({ target: { tabId: activeTab.id }, files: ['content-script.js'] });
     const mode = $('captureMode').value;
     const companyAlias = await saveCompanyProfile();

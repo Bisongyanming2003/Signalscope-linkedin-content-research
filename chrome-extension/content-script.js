@@ -60,6 +60,7 @@
   const randomWait = config => sleep(config.minWaitMs + Math.random() * (config.maxWaitMs - config.minWaitMs));
   const keyOf = row => row.post_url || `${row.publish_date || row.published_at_raw || row.estimated_publish_date || row.post_date_raw || row.post_date || ''}|${String(row.post_text || '').slice(0,180)}`;
   const VIDEO_UI_RE = /Video Player|Play Video|Skip Backward|Skip Forward|Current Time|Duration|Stream Type|Playback Rate|subtitles settings|Audio Track|Picture-in-Picture|Fullscreen|Caption Area|End of dialog window/i;
+  const permalinkCache = new WeakMap();
 
   function actionLabel(node) {
     return clean([
@@ -229,6 +230,43 @@
     return null;
   }
 
+  function capturedLink(timeout=350) {
+    return new Promise(resolve=>{
+      let timer;
+      const receive=event=>{
+        if(event.source!==window||event.data?.source!=='signalscope-page'||event.data?.type!=='captured-post-link')return;
+        clearTimeout(timer);window.removeEventListener('message',receive);resolve(clean(event.data.value));
+      };
+      window.addEventListener('message',receive);
+      timer=setTimeout(()=>{window.removeEventListener('message',receive);resolve('');},timeout);
+    });
+  }
+
+  async function permalinkFromMenu(post) {
+    if(permalinkCache.has(post))return permalinkCache.get(post);
+    const task=(async()=>{
+      const controls=[...post.querySelectorAll('button,[role="button"]')];
+      const menuButton=controls.find(node=>/动态控制菜单|post control menu|open.*control menu/i.test(actionLabel(node)));
+      if(!menuButton)return '';
+      try{
+        menuButton.click();await sleep(90);
+        const menuItems=[...document.querySelectorAll('[role="menuitem"],button,[role="button"]')].filter(node=>{
+          const rect=node.getBoundingClientRect();return rect.width>0&&rect.height>0;
+        });
+        const copyItem=menuItems.find(node=>/复制动态链接|复制帖子链接|copy link to (?:post|update)/i.test(actionLabel(node)));
+        if(!copyItem){menuButton.click();return '';}
+        for(const attr of copyItem.attributes||[]){
+          const value=clean(attr.value);if(/^https:\/\/(?:www\.)?linkedin\.com\/(?:feed\/update|posts\/)/i.test(value))return value;
+        }
+        const result=capturedLink();
+        window.dispatchEvent(new CustomEvent('signalscope-arm-link-capture'));
+        copyItem.click();
+        return await result;
+      }catch{return '';}
+    })();
+    permalinkCache.set(post,task);return task;
+  }
+
   function activityDate(id) {
     try { return id ? new Date(Number(BigInt(id) >> 22n)).toISOString() : ''; } catch { return ''; }
   }
@@ -315,7 +353,7 @@
     return { date:new Date(new Date(collectedAt).getTime()-days*86400000).toISOString().slice(0,10), estimated:true };
   }
 
-  function extract(post) {
+  async function extract(post) {
     const dateLink=first(post,SELECTORS.dateLink), dateEl=first(post,SELECTORS.date);
     const fallbackDate=clean(post.innerText).match(/(?:^|\s)(\d+\s*(?:分钟|小时|天|日|周|星期|个月|月|年|mins?|minutes?|hours?|days?|weeks?|months?|years?))(?:\s*[•·])/i)?.[1]||'';
     const textEl=meaningfulTextElement(post);
@@ -324,7 +362,7 @@
     const urn=post.getAttribute('data-urn')||post.getAttribute('data-id')||'', activity=urn.match(/urn:li:activity:\d+/)?.[0],activityRef=activityRefOf(post);
     const href=dateLink?.href||dateLink?.closest('a')?.href||'';
     const permanentHref=/\/feed\/update\/urn:li:activity:\d+|urn:li:activity:\d+|\/posts\/[^/?#]+-activity-\d+/i.test(href)?href:'';
-    const url=permanentHref||(activity?`https://www.linkedin.com/feed/update/${activity}/`:activityRef?`https://www.linkedin.com/feed/update/urn:li:${activityRef.type}:${activityRef.id}/`:'');
+    const url=permanentHref||(activity?`https://www.linkedin.com/feed/update/${activity}/`:activityRef?`https://www.linkedin.com/feed/update/urn:li:${activityRef.type}:${activityRef.id}/`:await permalinkFromMenu(post));
     return {company:companyName(),collected_at:collectedAt,published_at_raw:rawDate,estimated_publish_date:normalized.date,post_text_raw:textParts.raw,post_text:textParts.text,hashtags:textParts.hashtags,post_url:url,
       reactions:countFrom(post,SELECTORS.reactions,/\d[\d,.]*\s*(?:次回应|reactions?|likes?|赞)/i),comments:countFrom(post,SELECTORS.comments,/\d[\d,.]*\s*(?:条?评论|comments?)/i),reposts:countFrom(post,SELECTORS.reposts,/\d[\d,.]*\s*(?:次?重新发布|次?转发|reposts?|shares?)/i),media_type:mediaType(post)};
   }
@@ -375,7 +413,7 @@
         const label=textOf(button)||clean(button.getAttribute('aria-label'));
         if(/see more|查看更多|显示更多|…more/i.test(label)&&!button.disabled)try{button.click();await sleep(200);}catch(error){errors.push(String(error));}
       }
-      for(const post of currentPosts)try{const row=extract(post),key=keyOf(row),date=publishDate(row);if(!key)continue;if(historyKeys.has(key))reached=true;else if(!collected.has(key))collected.set(key,row);if(direction==='down'&&config.startDate&&date&&date<config.startDate)dateReached=true;}catch(error){errors.push(String(error));}
+      for(const post of currentPosts)try{const row=await extract(post),key=keyOf(row),date=publishDate(row);if(!key)continue;if(historyKeys.has(key))reached=true;else if(!collected.has(key))collected.set(key,row);if(direction==='down'&&config.startDate&&date&&date<config.startDate)dateReached=true;}catch(error){errors.push(String(error));}
       const added=collected.size-previous;
       const scroll=scrollController(),height=scroll.height;
       const moved=previousScrollTop<0||Math.abs(scroll.top-previousScrollTop)>4;
